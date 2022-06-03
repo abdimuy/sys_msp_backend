@@ -1,0 +1,5 @@
+export const ALMACEN_ID_DEFAULT = 19;
+export const ARTICULO_ESTATUS_DEFAULT = "A";
+export const CONCEPTO_VENTA_MOSTRADOR = 5;
+export const CONCEPTO_ENGANCHE = 24533;
+export const CONCEPTO_COBRANZA_RUTA = 409867;
