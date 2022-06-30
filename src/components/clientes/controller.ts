@@ -22,7 +22,19 @@ const getClienteByText = (text: string) => {
   });
 };
 
+const getClientesByRuta = (rutaId: number) => {
+  return new Promise<any[]>(async (resolve, reject) => {
+    try {
+      const clientesList = await store.getClientesByRuta(rutaId);
+      resolve(clientesList);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
 export default {
   getClienteById,
   getClienteByText,
+  getClientesByRuta,
 };

@@ -1,5 +1,9 @@
 import { query } from "../../repositories/fbRepository";
-import { QUERY_GET_CLIENTE_BY_ID, QUERY_GET_CLIENTE_BY_TEXT } from "./queries";
+import {
+  QUERY_GET_CLIENTE_BY_ID,
+  QUERY_GET_CLIENTE_BY_TEXT,
+  QUERY_GET_CLIENTE_BY_RUTA,
+} from "./queries";
 import { IQueryConverter } from "../../repositories/fbRepository";
 
 interface IGetClienteByIdStore {
@@ -51,7 +55,22 @@ const getClienteByText = (text: string) => {
   });
 };
 
+const getClientesByRuta = (rutaId: number) => {
+  return new Promise<any[]>(async (resolve, reject) => {
+    try {
+      const clientesList = await query({
+        sql: QUERY_GET_CLIENTE_BY_RUTA,
+        params: [rutaId],
+      });
+      resolve(clientesList);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
 export default {
   getCliente: getClienteById,
   getClienteByText,
+  getClientesByRuta,
 };

@@ -1,4 +1,4 @@
-import express, { response } from "express";
+import express from "express";
 import controller from "./controller";
 import responses from "../../network/responses";
 
@@ -7,7 +7,7 @@ const router = express.Router();
 router.get("/ruta/:numRuta", (req, res) => {
   const { numRuta } = req.params;
   controller
-    .getVentasByRuta()
+    .getVentasByRuta(parseInt(numRuta))
     .then((ventas) => {
       responses.success({ req, res, data: ventas });
     })

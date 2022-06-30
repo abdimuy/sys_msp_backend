@@ -8,6 +8,8 @@ import lineasArticulos from "../components/lineaArticulo/network";
 import vendedores from "../components/vendedores/network";
 import ventas from "../components/ventas/network";
 import clientes from "../components/clientes/network";
+import rutas from "../components/rutas/network";
+import reportesPorRuta from "../components/reportePorRuta/network";
 
 const appRouter = (server: Express) => {
   server.use("/", Home);
@@ -19,6 +21,8 @@ const appRouter = (server: Express) => {
   server.use("/vendedores", vendedores);
   server.use("/ventas", ventas);
   server.use("/clientes", clientes);
+  server.use("/rutas", rutas);
+  server.use("/reports_ruta", reportesPorRuta);
 };
 
 export default appRouter;

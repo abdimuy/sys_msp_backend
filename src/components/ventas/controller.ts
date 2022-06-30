@@ -13,8 +13,10 @@ const getVentasByCliente = (clienteId: number) => {
       ]);
       const ventasAgrupadas = groupBy(
         ventas,
-        (venta: any) => venta.DOCTO_CC_ACR_ID
+        (venta: any) => venta.DOCTO_CC_ACR_ID,
+        (venta: any) => venta
       );
+      let foliosArray: string[] = [];
       const ventasWithHistorial = Object.keys(ventasAgrupadas).map(
         (key: any, index) => {
           const venta = ventasAgrupadas[key];
@@ -26,30 +28,32 @@ const getVentasByCliente = (clienteId: number) => {
             (ventaItem: any) =>
               ventaItem?.CONCEPTO_CC_ID !== CONCEPTO_VENTA_MOSTRADOR
           );
+
+          foliosArray.push(ventaArticulo[0]?.FOLIO);
+
           return {
-            VENTA: ventaArticulo[0],
+            VENTA: { ...ventaArticulo[0] },
             HISTORIAL: historial,
           };
         }
       );
-      //Ciclo con posible optimizacion en la consulta
-      // let ventasFinalesProductos: any[] = [];
-      // for (const venta of ventasWithHistorial) {
-      //   const ventaProductos = await store.ventasProductosByFolio(
-      //     venta.VENTA.FOLIO
-      //   );
-      //   ventasFinalesProductos = [
-      //     ...ventasFinalesProductos,
-      //     { ...venta, VENTA: { ...venta.VENTA, PRODUCTOS: ventaProductos } },
-      //   ];
-      //   // console.log(ventaProductos);
-      // }
-      // resolve({ CLIENTE: cliente[0], VENTAS: ventasFinalesProductos });
 
-      const ventasFinales = revisarUltPagos(ventasWithHistorial);
+      const ventasProductos = await store.ventasProductosByFolio(foliosArray);
+
+      const ventasWithProductos = ventasWithHistorial.map((venta: any) => {
+        const productos = ventasProductos.filter(
+          (producto: any) => producto.FOLIO === venta.VENTA.FOLIO
+        );
+        return {
+          ...venta,
+          VENTA: { ...venta.VENTA, PRODUCTOS: productos },
+        };
+      });
+      const ventasFinales = revisarUltPagos(ventasWithProductos);
 
       resolve({ CLIENTE: cliente[0], VENTAS: ventasFinales });
     } catch (err) {
+      console.log(err);
       reject(err);
     }
   });
@@ -65,12 +69,37 @@ const revisarUltPagos = (ventas: any[]) => {
   });
 };
 
-const getVentasByRuta = () => {
+const getVentasByRuta = (numRuta: number) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const ventas = await store.ventasByRuta(1);
-      const ventasConAtraso = calcularAtrasos(ventas);
+      const clientesPorRuta = await controllerClientes.getClientesByRuta(
+        numRuta
+      );
+      const clientesPorRutaIds = clientesPorRuta.map(
+        (cliente) => cliente.CLIENTE_ID
+      );
+      const ventasPorRuta = await store.ventasByRuta(
+        clientesPorRutaIds.join(",")
+      );
+      const ventasConAtraso = calcularAtrasos(ventasPorRuta);
+      // const ventasIds = ventasConAtraso
+      //   .map((cuenta) => cuenta.DOCTO_CC_ACR_ID)
+      //   .toString();
+      // const ventasEstado = store.ventasById(ventasIds);
       resolve(ventasConAtraso);
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
+const getVentasById = (ventasId: string) => {
+  return new Promise<any[]>(async (resolve, reject) => {
+    try {
+      const ventas = await store.ventasById(ventasId);
+      const ventasIds = ventas.map((venta) => venta.DOCTO_CC_ACR_ID);
+      const ventasConAtrasos = calcularAtrasos(ventasIds);
+      resolve(ventasConAtrasos);
     } catch (err) {
       reject(err);
     }
@@ -88,6 +117,11 @@ const calcularAtrasos = (ventas: any[]) => {
         NUM_PLAZOS_ATRASADOS: 0,
       };
     }
+
+    const vendedores = `${venta.VENDEDORE_1 ?? venta.VENDEDOR_1 + ","} ${
+      venta.VENDEDOR_2 ?? venta.VENDEDOR_2 + ","
+    } ${venta.VENDEDOR_3 && venta.VENDEDOR_3 + ","}`;
+
     const fechaVenta = moment(venta.FECHA);
     const fechaLiq = moment(
       venta.SALDO_REST === 0 ? venta.FECHA_ULT_PAGO : moment()
@@ -99,12 +133,22 @@ const calcularAtrasos = (ventas: any[]) => {
     const importeActualEstimado = plazosTrascurridos * venta?.PARCIALIDAD;
     const importeAtrasado = importeActualEstimado - venta?.TOTAL_IMPORTE;
     const numPlazosAtrazados = plazosTrascurridos - venta?.NUM_IMPORTES;
+    const numPlazosAtrasadosSegunSaldo =
+      (importeActualEstimado - venta?.TOTAL_IMPORTE - venta?.IMPTE_REST) /
+      venta?.PARCIALIDAD;
+    const tiempoTranscurridoDays = moment(fechaVenta).diff(fechaLiq, "days");
+    const tiempoTransHumanizado = moment
+      .duration(tiempoTranscurridoDays, "days")
+      .humanize(true);
     return {
       ...venta,
+      VENDEDORES: vendedores,
       PLAZOS_TRANS: plazosTrascurridos,
       IMPTE_ACTUAL_ESTIMADO: importeActualEstimado,
       IMPTE_ATRASADO: importeAtrasado,
       NUM_PLAZOS_ATRASADO: numPlazosAtrazados,
+      NUM_PLAZOS_ATRASADOS_BY_SALDO: numPlazosAtrasadosSegunSaldo,
+      TIEMPO_TRANSCURRIDO: tiempoTransHumanizado,
     };
   });
 };
@@ -113,7 +157,7 @@ const tipoFrecuenciaDePago: any = {
   SEMANAL: (fechaVenta: moment.Moment, fechaLiquid: moment.Moment) =>
     moment(fechaLiquid).diff(fechaVenta, "weeks"),
   QUINCENAL: (fechaVenta = moment(), fechaLiquid: moment.Moment) =>
-    moment(fechaLiquid).diff(fechaVenta, "months", true) / 2,
+    moment(fechaLiquid).diff(fechaVenta, "month", true) * 2,
   MENSUAL: (fechaVenta = moment(), fechaLiquid: moment.Moment) =>
     moment(fechaLiquid).diff(fechaVenta, "months"),
 };
@@ -121,4 +165,5 @@ const tipoFrecuenciaDePago: any = {
 export default {
   getVentasByCliente,
   getVentasByRuta,
+  getVentasById,
 };
