@@ -21,7 +21,6 @@ router.get("/", (req, res) => {
 });
 
 router.get("/num_ctas_por_ruta", (req, res) => {
-  console.log("hola");
   controller
     .getNumCtasByRuta()
     .then((numCtasRutas) => {

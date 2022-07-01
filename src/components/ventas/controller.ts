@@ -133,9 +133,18 @@ const calcularAtrasos = (ventas: any[]) => {
     const importeActualEstimado = plazosTrascurridos * venta?.PARCIALIDAD;
     const importeAtrasado = importeActualEstimado - venta?.TOTAL_IMPORTE;
     const numPlazosAtrazados = plazosTrascurridos - venta?.NUM_IMPORTES;
-    const numPlazosAtrasadosSegunSaldo =
+    const numPlazosAtrasadosSegunSaldoEstimado =
       (importeActualEstimado - venta?.TOTAL_IMPORTE - venta?.IMPTE_REST) /
       venta?.PARCIALIDAD;
+
+    const maxNumPlazosAtrasadosSegunSaldo =
+      venta?.SALDO_REST / venta?.PARCIALIDAD;
+
+    const numPlazosAtrasadosSegunSaldo =
+      numPlazosAtrasadosSegunSaldoEstimado > maxNumPlazosAtrasadosSegunSaldo
+        ? maxNumPlazosAtrasadosSegunSaldo
+        : numPlazosAtrasadosSegunSaldoEstimado;
+
     const tiempoTranscurridoDays = moment(fechaVenta).diff(fechaLiq, "days");
     const tiempoTransHumanizado = moment
       .duration(tiempoTranscurridoDays, "days")
