@@ -26,9 +26,9 @@ const converters: IQueryConverter[] = [
 ];
 
 const getClienteById = ({ clienteId }: IGetClienteByIdStore) => {
-  return new Promise<any[]>((resolve, reject) => {
+  return new Promise<any[]>(async (resolve, reject) => {
     try {
-      const cliente = query({
+      const cliente = await query({
         sql: QUERY_GET_CLIENTE_BY_ID,
         params: [clienteId],
         converters: converters,

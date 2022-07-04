@@ -11,7 +11,7 @@ const getVentasByCliente = (clienteId: number) => {
         store.ventasByCliente({ clienteId }),
         controllerClientes.getClienteById(clienteId),
       ]);
-      const ventasAgrupadas = groupBy(
+      const ventasAgrupadas: any[] = groupBy(
         ventas,
         (venta: any) => venta.DOCTO_CC_ACR_ID,
         (venta: any) => venta
@@ -28,12 +28,26 @@ const getVentasByCliente = (clienteId: number) => {
             (ventaItem: any) =>
               ventaItem?.CONCEPTO_CC_ID !== CONCEPTO_VENTA_MOSTRADOR
           );
-
+          const importeTotal = historial.reduce(
+            (a: any, b: any, index: number) => a + b.CANTIDAD,
+            0
+          );
+          const historialPorMes = groupBy(
+            historial,
+            (item: any) => item.MES,
+            (item: any) => item
+          );
+          // console.log(importeTotal);
           foliosArray.push(ventaArticulo[0]?.FOLIO);
 
           return {
-            VENTA: { ...ventaArticulo[0] },
+            VENTA: {
+              ...ventaArticulo[0],
+              TOTAL_IMPORTE: importeTotal,
+              SALDO_REST: ventaArticulo[0].CANTIDAD - importeTotal,
+            },
             HISTORIAL: historial,
+            HISTORIAL_POR_MES: historialPorMes,
           };
         }
       );
