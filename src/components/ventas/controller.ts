@@ -29,7 +29,7 @@ const getVentasByCliente = (clienteId: number) => {
               ventaItem?.CONCEPTO_CC_ID !== CONCEPTO_VENTA_MOSTRADOR
           );
           const importeTotal = historial.reduce(
-            (a: any, b: any, index: number) => a + b.CANTIDAD,
+            (a: any, b: any) => a + b.CANTIDAD,
             0
           );
           const historialPorMes = groupBy(
@@ -37,7 +37,6 @@ const getVentasByCliente = (clienteId: number) => {
             (item: any) => item.ANO_MES,
             (item: any) => item
           );
-          // console.log(importeTotal);
           foliosArray.push(ventaArticulo[0]?.FOLIO);
 
           return {
