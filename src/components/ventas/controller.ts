@@ -34,7 +34,7 @@ const getVentasByCliente = (clienteId: number) => {
           );
           const historialPorMes = groupBy(
             historial,
-            (item: any) => item.MES,
+            (item: any) => item.ANO_MES,
             (item: any) => item
           );
           // console.log(importeTotal);

@@ -21,6 +21,10 @@ const convertersVentas: IQueryConverter[] = [
     type: "buffer",
   },
   {
+    column: "DESCRIPCION",
+    type: "buffer",
+  },
+  {
     column: "CANCELADO",
     type: "buffer",
   },
