@@ -19,8 +19,6 @@ const getNumCtasByRuta = () => {
   return new Promise<any[]>(async (resolve, reject) => {
     const ultimoMartes = moment().day("Tuesday").format("YYYY-MM-DD");
     const inicioSemana = moment().day(0);
-    const finalSemana = moment().day(6);
-    console.log({ inicioSemana, finalSemana });
     const numCtasRutas = await query({
       sql: QUERY_GET_CTAS_POR_RUTAS,
       params: [ultimoMartes, inicioSemana, ultimoMartes],

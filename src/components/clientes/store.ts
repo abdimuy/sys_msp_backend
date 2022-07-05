@@ -16,10 +16,6 @@ const converters: IQueryConverter[] = [
     type: "buffer",
   },
   {
-    column: "ESTATUS",
-    type: "buffer",
-  },
-  {
     column: "TELEFONO",
     type: "buffer",
   },
@@ -45,7 +41,7 @@ const getClienteByText = (text: string) => {
     try {
       const cliente = await query({
         sql: QUERY_GET_CLIENTE_BY_TEXT,
-        params: [text],
+        params: [text, text],
         converters: converters,
       });
       resolve(cliente);
