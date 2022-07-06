@@ -9,6 +9,7 @@ const getReportsRutas = (semanas: string) => {
     resolve(
       query({
         sql: QUERY_GET_REPORTS_BY_RUTA(semanas),
+        converters: [{ column: "ZONA", type: "buffer" }],
       })
     );
   });

@@ -1,7 +1,6 @@
 import { groupBy } from "../../utils/arrayGroupBy";
 import store from "./store";
 import controllerRutas from "../rutas/controller";
-import controllerVentas from "../ventas/controller";
 import moment from "moment";
 
 const getReportsRutas = () => {
@@ -14,10 +13,9 @@ const getReportsRutas = () => {
           controllerRutas.getNumCtasByRuta(),
           store.listPorcentajesParcialidadRuta(),
         ]);
-      // console.log(porcentajesParcialidadVentas);
       const reportsGroup = groupBy(
         reportsPorRuta,
-        (reporte: any) => reporte.COBRADOR_ID,
+        (reporte: any) => reporte.ZONA_CLIENTE_ID,
         (reporte: any) => ({
           ...reporte,
           SEMANA: parseInt(
@@ -29,19 +27,20 @@ const getReportsRutas = () => {
       const reports = Object.keys(reportsGroup).map((key: any) => {
         const total_cuentas = numCtasRutas.find(
           (numCtasRuta) =>
-            numCtasRuta.COBRADOR_ID === reportsGroup[key][0].COBRADOR_ID
-        ).TOTAL_CUENTAS;
-        const porcentajeParcialidaRuta = porcentajesParcialidadRutas.find(
-          (porceParcialRuta) =>
-            porceParcialRuta.COBRADOR_ID === reportsGroup[key][0].COBRADOR_ID
-        );
+            numCtasRuta.ZONA_CLIENTE_ID === reportsGroup[key][0].ZONA_CLIENTE_ID
+        )?.TOTAL_CUENTAS;
+        // const porcentajeParcialidaRuta = porcentajesParcialidadRutas.find(
+        //   (porceParcialRuta) =>
+        //     porceParcialRuta.ZONA_CLIENTE_ID ===
+        //     reportsGroup[key][0].ZONA_CLIENTE_ID
+        // );
         return {
           ...reportsGroup[key][0],
           NUMERO_CTAS: total_cuentas,
           PORCENTAJE_COBRO:
             (reportsGroup[key][0].NUM_CTAS_COB / total_cuentas) * 100,
-          PORCENTAJE_COBRO_PARCIALIDAD:
-            porcentajeParcialidaRuta.SUM_PORC_PAGOS_RUTA,
+          // PORCENTAJE_COBRO_PARCIALIDAD:
+          //   porcentajeParcialidaRuta.SUM_PORC_PAGOS_RUTA,
           HISTORIAL: reportsGroup[key],
         };
       });
