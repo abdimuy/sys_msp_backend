@@ -37,8 +37,12 @@ const getReportsRutas = () => {
         return {
           ...reportsGroup[key][0],
           NUMERO_CTAS: total_cuentas,
-          PORCENTAJE_COBRO:
-            (reportsGroup[key][0].NUM_CTAS_COB / total_cuentas) * 100,
+          PORCENTAJE_COBRO: Number.parseFloat(
+            (
+              (reportsGroup[key][0].NUM_CTAS_COB / total_cuentas) *
+              100
+            ).toString()
+          ).toFixed(2),
           // PORCENTAJE_COBRO_PARCIALIDAD:
           //   porcentajeParcialidaRuta.SUM_PORC_PAGOS_RUTA,
           HISTORIAL: reportsGroup[key],

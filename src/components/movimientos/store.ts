@@ -6,26 +6,26 @@ import {
 import { IQueryConverter } from "../../repositories/fbRepository";
 import { ApiMicrosip } from "../../repositories/apiMicrosip";
 import { IMovimiento, ITraspaso } from "./controller";
-import axios, { Axios } from 'axios';
+import axios, { Axios } from "axios";
 
 const converter: IQueryConverter[] = [
   {
-    type: 'buffer',
-    column: 'DESCRIPCION'
+    type: "buffer",
+    column: "DESCRIPCION",
   },
   {
-    type: 'buffer',
-    column: 'USUARIO_ULT_MODIF'
+    type: "buffer",
+    column: "USUARIO_ULT_MODIF",
   },
   {
-    type: 'buffer',
-    column: 'FOLIO'
+    type: "buffer",
+    column: "FOLIO",
   },
   {
-    type: 'buffer',
-    column: 'CONCEPTO'
-  }
-]
+    type: "buffer",
+    column: "CONCEPTO",
+  },
+];
 
 const getMovimientos = () => {
   return new Promise<any[]>(async (resolve, reject) => {
@@ -33,12 +33,12 @@ const getMovimientos = () => {
       const movimientos = await query({
         sql: QUERY_GET_MOVIMIENTOS,
         params: [15],
-        converters: converter
+        converters: converter,
       });
       resolve(movimientos);
     } catch (err) {
       reject(err);
-    };
+    }
   });
 };
 
@@ -48,14 +48,14 @@ const getMovimientosOneAlmacen = (almacenId: number) => {
       const movimientos = await query({
         sql: QUERY_GET_MOVIMIENTOS_BY_ALMACEN_ID,
         params: [15, almacenId],
-        converters: converter
+        converters: converter,
       });
       resolve(movimientos);
     } catch (err) {
       reject(err);
-    };
+    }
   });
-}
+};
 
 const setMovimiento = (traspaso: ITraspaso) => {
   const {
@@ -74,23 +74,21 @@ const setMovimiento = (traspaso: ITraspaso) => {
         almacen_finish_id: almacenEndId,
         fecha: fecha,
         descripcion: descripcion,
-        lista: movimientos.map(movimiento => ({
+        lista: movimientos.map((movimiento) => ({
           articulo_id: movimiento.articuloId,
           unidades: movimiento.cantidad,
-        }))
-      }
-      console.log(traspasoApi);
-      const response = await ApiMicrosip.post('inventory', traspasoApi);
-      // console.log(response);
+        })),
+      };
+      const response = await ApiMicrosip.post("inventory", traspasoApi);
       resolve(response.data);
     } catch (err) {
       reject(err);
     }
-  })
-}
+  });
+};
 
 export default {
   list: getMovimientos,
   oneByAlmacen: getMovimientosOneAlmacen,
-  set: setMovimiento
+  set: setMovimiento,
 };

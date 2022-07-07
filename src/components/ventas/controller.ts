@@ -18,7 +18,7 @@ const getVentasByCliente = (clienteId: number) => {
       );
       let foliosArray: string[] = [];
       const ventasWithHistorial = Object.keys(ventasAgrupadas).map(
-        (key: any, index) => {
+        (key: any) => {
           const venta = ventasAgrupadas[key];
           const ventaArticulo: any[] = venta.filter(
             (ventaItem: any) =>
@@ -63,8 +63,11 @@ const getVentasByCliente = (clienteId: number) => {
         };
       });
       const ventasFinales = revisarUltPagos(ventasWithProductos);
+      const ventasOrdenadas = ventasFinales.sort(
+        (a, b) => b.VENTA.SALDO_REST - a.VENTA.SALDO_REST
+      );
 
-      resolve({ CLIENTE: cliente[0], VENTAS: ventasFinales });
+      resolve({ CLIENTE: cliente[0], VENTAS: ventasOrdenadas });
     } catch (err) {
       console.log(err);
       reject(err);
