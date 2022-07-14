@@ -3,6 +3,7 @@ import store from "./stores";
 import controllerClientes from "../clientes/controller";
 import { CONCEPTO_VENTA_MOSTRADOR } from "../../constants/fbStoreConstanst";
 import moment from "moment";
+import { SUBCONSUTA_GET_CLIENTES_ACTIVOS } from "./queries";
 
 const getVentasByCliente = (clienteId: number) => {
   return new Promise(async (resolve, reject) => {
@@ -88,15 +89,18 @@ const revisarUltPagos = (ventas: any[]) => {
 const getVentasByRuta = (numRuta: number) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const clientesPorRuta = await controllerClientes.getClientesByRuta(
-        numRuta
-      );
-      const clientesPorRutaIds = clientesPorRuta.map(
-        (cliente) => cliente.CLIENTE_ID
-      );
-      const ventasPorRuta = await store.ventasByRuta(
-        clientesPorRutaIds.join(",")
-      );
+      let clientesPorRutaIds: string;
+      if (numRuta === 0) {
+        clientesPorRutaIds = SUBCONSUTA_GET_CLIENTES_ACTIVOS;
+      } else {
+        const clientesPorRuta = await controllerClientes.getClientesByRuta(
+          numRuta
+        );
+        clientesPorRutaIds = clientesPorRuta
+          .map((cliente) => cliente.CLIENTE_ID)
+          .join(",");
+      }
+      const ventasPorRuta = await store.ventasByRuta(clientesPorRutaIds);
       const ventasConAtraso = calcularAtrasos(ventasPorRuta);
       // const ventasIds = ventasConAtraso
       //   .map((cuenta) => cuenta.DOCTO_CC_ACR_ID)

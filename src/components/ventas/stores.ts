@@ -103,6 +103,14 @@ const getVentasByRuta = (clientesId: string) => {
             column: "VENDEDOR_3",
             type: "buffer",
           },
+          {
+            column: "LOCALIDAD",
+            type: "buffer",
+          },
+          {
+            column: "RUTA",
+            type: "buffer",
+          },
         ],
       });
       resolve(ventas);
