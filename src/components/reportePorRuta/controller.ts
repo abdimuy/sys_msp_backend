@@ -45,8 +45,13 @@ const getReportsRutas = () => {
             ).toString()
           ).toFixed(2),
           PORCENTAJE_COBRO_PARCIALIDAD:
-            (porcentajeParcialidaRuta?.PAGO_PARCIAL_PROMEDIO / total_cuentas) *
-              100 || 0,
+            Number.parseFloat(
+              (
+                (porcentajeParcialidaRuta?.TOTAL_COBRO_PARCIAL /
+                  total_cuentas) *
+                100
+              ).toString()
+            ).toFixed(2) || 0,
           HISTORIAL: reportsGroup[key],
         };
       });
