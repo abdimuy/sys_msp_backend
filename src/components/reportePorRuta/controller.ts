@@ -7,11 +7,12 @@ const getReportsRutas = () => {
   return new Promise(async (resolve, reject) => {
     try {
       const fechasUltDiezSemanas = calcFechasUltDiezSemanas();
+      const fechaSemanaActual = moment().format("YYYYW");
       const [reportsPorRuta, numCtasRutas, porcentajesParcialidadRutas] =
         await Promise.all([
           store.listReportsRuta(fechasUltDiezSemanas),
           controllerRutas.getNumCtasByRuta(),
-          store.listPorcentajesParcialidadRuta(),
+          store.listPorcentajesParcialidadRuta(parseInt(fechaSemanaActual)),
         ]);
       const reportsGroup = groupBy(
         reportsPorRuta,
@@ -29,11 +30,11 @@ const getReportsRutas = () => {
           (numCtasRuta) =>
             numCtasRuta.ZONA_CLIENTE_ID === reportsGroup[key][0].ZONA_CLIENTE_ID
         )?.TOTAL_CUENTAS;
-        // const porcentajeParcialidaRuta = porcentajesParcialidadRutas.find(
-        //   (porceParcialRuta) =>
-        //     porceParcialRuta.ZONA_CLIENTE_ID ===
-        //     reportsGroup[key][0].ZONA_CLIENTE_ID
-        // );
+        const porcentajeParcialidaRuta = porcentajesParcialidadRutas.find(
+          (porceParcialRuta) =>
+            porceParcialRuta.ZONA_CLIENTE_ID ===
+            reportsGroup[key][0].ZONA_CLIENTE_ID
+        );
         return {
           ...reportsGroup[key][0],
           NUMERO_CTAS: total_cuentas,
@@ -43,8 +44,8 @@ const getReportsRutas = () => {
               100
             ).toString()
           ).toFixed(2),
-          // PORCENTAJE_COBRO_PARCIALIDAD:
-          //   porcentajeParcialidaRuta.SUM_PORC_PAGOS_RUTA,
+          PORCENTAJE_COBRO_PARCIALIDAD:
+            porcentajeParcialidaRuta?.PAGO_PARCIAL_PROMEDIO || 0,
           HISTORIAL: reportsGroup[key],
         };
       });

@@ -15,11 +15,12 @@ const getReportsRutas = (semanas: string) => {
   });
 };
 
-const getPorcentajeBaseParcialidadPorRuta = () => {
+const getPorcentajeBaseParcialidadPorRuta = (semana: number) => {
   return new Promise<any[]>((resolve, reject) => {
     resolve(
       query({
         sql: QUERY_GET_PORCENTAJE_PARCIALIDAD_POR_RUTA,
+        params: [semana],
       })
     );
   });
