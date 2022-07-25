@@ -175,8 +175,8 @@ const calcularAtrasos = (ventas: any[]) => {
       PLAZOS_TRANS: plazosTrascurridos,
       IMPTE_ACTUAL_ESTIMADO: importeActualEstimado,
       IMPTE_ATRASADO: importeAtrasado,
-      NUM_PLAZOS_ATRASADO: numPlazosAtrazados,
-      NUM_PLAZOS_ATRASADOS_BY_SALDO: numPlazosAtrasadosSegunSaldo,
+      NUM_PLAZOS_ATRASADO: numPlazosAtrazados.toFixed(2),
+      NUM_PLAZOS_ATRASADOS_BY_SALDO: numPlazosAtrasadosSegunSaldo.toFixed(1),
       TIEMPO_TRANSCURRIDO: tiempoTransHumanizado,
     };
   });
