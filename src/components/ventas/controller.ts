@@ -142,42 +142,42 @@ const calcularAtrasos = (ventas: any[]) => {
       venta.VENDEDOR_2 ?? venta.VENDEDOR_2 + ","
     } ${venta.VENDEDOR_3 && venta.VENDEDOR_3 + ","}`;
 
-    // const fechaVenta = moment(venta.FECHA);
-    // const fechaLiq = moment(
-    //   venta.SALDO_REST === 0 ? venta.FECHA_ULT_PAGO : moment()
-    // );
-    // const plazosTrascurridos = tipoFrecuenciaDePago[venta.FREC_PAGO](
-    //   fechaVenta,
-    //   fechaLiq
-    // );
-    // const importeActualEstimado = plazosTrascurridos * venta?.PARCIALIDAD;
-    // const importeAtrasado = importeActualEstimado - venta?.TOTAL_IMPORTE;
-    // const numPlazosAtrazados = plazosTrascurridos - venta?.NUM_IMPORTES;
-    // const numPlazosAtrasadosSegunSaldoEstimado =
-    //   (importeActualEstimado - venta?.TOTAL_IMPORTE - venta?.IMPTE_REST) /
-    //   venta?.PARCIALIDAD;
+    const fechaVenta = moment(venta.FECHA);
+    const fechaLiq = moment(
+      venta.SALDO_REST === 0 ? venta.FECHA_ULT_PAGO : moment()
+    );
+    const plazosTrascurridos = tipoFrecuenciaDePago[venta.FREC_PAGO](
+      fechaVenta,
+      fechaLiq
+    );
+    const importeActualEstimado = plazosTrascurridos * venta?.PARCIALIDAD;
+    const importeAtrasado = importeActualEstimado - venta?.TOTAL_IMPORTE;
+    const numPlazosAtrazados = plazosTrascurridos - venta?.NUM_IMPORTES;
+    const numPlazosAtrasadosSegunSaldoEstimado =
+      (importeActualEstimado - venta?.TOTAL_IMPORTE - venta?.IMPTE_REST) /
+      venta?.PARCIALIDAD;
 
-    // const maxNumPlazosAtrasadosSegunSaldo =
-    //   venta?.SALDO_REST / venta?.PARCIALIDAD;
+    const maxNumPlazosAtrasadosSegunSaldo =
+      venta?.SALDO_REST / venta?.PARCIALIDAD;
 
-    // const numPlazosAtrasadosSegunSaldo =
-    //   numPlazosAtrasadosSegunSaldoEstimado > maxNumPlazosAtrasadosSegunSaldo
-    //     ? maxNumPlazosAtrasadosSegunSaldo
-    //     : numPlazosAtrasadosSegunSaldoEstimado;
+    const numPlazosAtrasadosSegunSaldo =
+      numPlazosAtrasadosSegunSaldoEstimado > maxNumPlazosAtrasadosSegunSaldo
+        ? maxNumPlazosAtrasadosSegunSaldo
+        : numPlazosAtrasadosSegunSaldoEstimado;
 
-    // const tiempoTranscurridoDays = moment(fechaVenta).diff(fechaLiq, "days");
-    // const tiempoTransHumanizado = moment
-    //   .duration(tiempoTranscurridoDays, "days")
-    //   .humanize(true);
+    const tiempoTranscurridoDays = moment(fechaVenta).diff(fechaLiq, "days");
+    const tiempoTransHumanizado = moment
+      .duration(tiempoTranscurridoDays, "days")
+      .humanize(true);
     return {
       ...venta,
       VENDEDORES: vendedores,
-      // PLAZOS_TRANS: plazosTrascurridos,
-      // IMPTE_ACTUAL_ESTIMADO: importeActualEstimado,
-      // IMPTE_ATRASADO: importeAtrasado,
-      // NUM_PLAZOS_ATRASADO: numPlazosAtrazados,
-      // NUM_PLAZOS_ATRASADOS_BY_SALDO: numPlazosAtrasadosSegunSaldo,
-      // TIEMPO_TRANSCURRIDO: tiempoTransHumanizado,
+      PLAZOS_TRANS: plazosTrascurridos,
+      IMPTE_ACTUAL_ESTIMADO: importeActualEstimado,
+      IMPTE_ATRASADO: importeAtrasado,
+      NUM_PLAZOS_ATRASADO: numPlazosAtrazados.toFixed(2),
+      NUM_PLAZOS_ATRASADOS_BY_SALDO: numPlazosAtrasadosSegunSaldo.toFixed(1),
+      TIEMPO_TRANSCURRIDO: tiempoTransHumanizado,
     };
   });
 };
@@ -191,8 +191,41 @@ const tipoFrecuenciaDePago: any = {
     moment(fechaLiquid).diff(fechaVenta, "months"),
 };
 
+const getAllVentasWithCliente = async () => {
+  try {
+    const cuentas = await store.allVentasWithCliente();
+    return cuentas;
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+/*
+  Controlador para subir todas las ventas a la base de datos de MongoDB.
+*/
+const setAllVentasWithCliente = async () => {
+  try {
+    const cuentas = await store.setAllVentasWithCliente();
+    return cuentas;
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+const getNextFolioCR = async (): Promise<string | undefined> => {
+  try {
+    const folio = await store.getNextFolioCR();
+    return folio;
+  } catch (err) {
+    console.log(err);
+  }
+};
+
 export default {
   getVentasByCliente,
   getVentasByRuta,
   getVentasById,
+  getAllVentasWithCliente,
+  setAllVentasWithCliente,
+  getNextFolioCR,
 };

@@ -1,11 +1,12 @@
 import Firebird from "node-firebird";
 
 const pool = Firebird.pool(5, {
-  host: "SERVERM",
-  database: "C:\\Microsip datos\\MUEBLERA_SNP.fdb",
+  // host: "SERVERM",
+  // database: "C:\\Microsip datos\\MUEBLERA_SNP.fdb",
   port: 3050,
-  // host: "localhost",
+  host: "localhost",
   // database: "C:\\dev\\MUEBLERA_SNP.fdb",
+  database: "C:\\Users\\abdid\\Documents\\MUEBLERA_SNP\\MUEBLERA_SNP.fdb",
   user: "SYSDBA",
   password: "masterkey",
 });
@@ -34,9 +35,11 @@ export const query = ({
       pool.get((err, db) => {
         if (err) {
           reject(err);
+          return console.error(err);
         }
         db.query(sql, params, (err, rows) => {
           if (err) {
+            console.log(err);
             reject(err);
           }
           try {
