@@ -1,7 +1,9 @@
 import moment from "moment";
+import "moment-timezone";
 import { query } from "../../repositories/connection";
-import { IQueryConverter } from "../../repositories/fbRepository";
+import { IQueryConverter, pool } from "../../repositories/fbRepository";
 import { db } from "../../repositories/firebase";
+import Firebird from "node-firebird";
 import {
   QUERY_GET_VENTAS_BY_CLIENTE,
   QUERY_GET_ARTICULOS_BY_FOLIO,
@@ -14,9 +16,11 @@ import {
   QUERTY_INSERT_PAGO,
   QUERY_GET_CLAVE_CLIENTE,
   QUERY_INSERT_PAGO_IMPORTES,
+  QUERY_UPDATE_FOLIO_CR,
   // QUERY_GET_ARTICULOS_ITEMS_BY_VENTA_ID_PART_1,
   // QUERY_GET_ARTICULOS_ITEMS_BY_VENTA_ID_PART_2,
 } from "./queries";
+import { Timestamp } from "../../repositories/firebase";
 
 interface IGetVentasByClienteStore {
   clienteId: number;
@@ -295,29 +299,32 @@ const getNextFolioCR = async (): Promise<string> => {
 };
 
 const listeningPagos = () => {
+  const currentDate = moment();
   console.log("Listening pagos");
-  db.collection("pagos").onSnapshot((snapshot) => {
-    snapshot.docChanges().forEach(async (change) => {
-      if (change.type === "added") {
-        const data = change.doc.data();
-        console.log(data);
-        await insertDataToFirebird(
-          data.CLIENTE_ID,
-          data.FECHA_HORA_PAGO,
-          data.COBRADOR,
-          data.COBRADOR_ID,
-          data.LAT,
-          data.LNG,
-          data.IMPORTE
-        );
-      }
+  db.collection("pagos")
+    .where("FECHA_HORA_PAGO", ">", currentDate.toDate())
+    .onSnapshot((snapshot) => {
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === "added") {
+          const data = change.doc.data();
+          console.log(data);
+          await insertDataToFirebird(
+            data.CLIENTE_ID,
+            data.FECHA_HORA_PAGO,
+            data.COBRADOR,
+            data.COBRADOR_ID,
+            data.LAT,
+            data.LNG,
+            data.IMPORTE
+          );
+        }
+      });
     });
-  });
 };
 
 const insertDataToFirebird = async (
   clienteId: number,
-  fechaHoraPago: string,
+  fechaHoraPago: Timestamp,
   cobrador: string,
   cobradorId: number,
   lat: number,
@@ -325,92 +332,154 @@ const insertDataToFirebird = async (
   importe: number
 ) => {
   try {
-    const claveCliente = await getClaveCliente(clienteId);
-    const result = await query({
-      sql: QUERTY_INSERT_PAGO,
-      params: [
-        -1,
-        87327,
-        getNextFolioCR(),
-        "R",
-        225490,
-        moment().format("YYYY-MM-DD"),
-        moment().format("HH:mm:ss"),
-        claveCliente,
-        0,
-        fechaHoraPago,
-        clienteId,
-        1,
-        "N",
-        "N",
-        cobrador,
-        234,
-        null,
-        cobradorId,
-        "N",
-        "N",
-        "N",
-        null,
-        null,
-        0,
-        null,
-        "CC",
-        "N",
-        "P",
-        moment().format("YYYY-MM-DD"),
-        "N",
-        "N",
-        "PREIMP",
-        false,
-        null,
-        "N",
-        moment().format("YYYY-MM-DD"),
-        null,
-        "N",
-        null,
-        null,
-        "N",
-        "N",
-        null,
-        null,
-        null,
-        null,
-        null,
-        "COBRANZA EN RUTA 2.0",
-        moment().format("YYYY-MM-DD"),
-        null,
-        "COBRANZA EN RUTA 2.0",
-        moment().format("YYYY-MM-DD HH:mm:ss"),
-        "COBRANZA EN RUTA 2.0",
-        null,
-        null,
-        null,
-        lat,
-        lng,
-        null,
-      ],
+    pool.get((err, db) => {
+      if (err) {
+        console.error(err);
+        return;
+      }
+      db.transaction(
+        Firebird.ISOLATION_READ_COMMITED,
+        async (err, transaction) => {
+          transaction.query(
+            QUERY_GET_NEXT_FOLIO_CR,
+            [clienteId],
+            (err, result) => {
+              console.log("result: ", result);
+              const folioNumber = result[0].FOLIO;
+              if (err) {
+                console.error(err);
+                transaction.rollback();
+              }
+              transaction.query(
+                QUERY_UPDATE_FOLIO_CR,
+                [],
+                async (err, result) => {
+                  if (err) {
+                    console.error(err);
+                    transaction.rollback();
+                  }
+
+                  const claveCliente = await getClaveCliente(clienteId);
+                  const folio = "CR" + folioNumber;
+
+                  const params = [
+                    -1,
+                    87327,
+                    folio,
+                    "R",
+                    225490,
+                    moment().format("YYYY-MM-DD"),
+                    moment().format("HH:mm:ss"),
+                    claveCliente,
+                    0,
+                    moment().format(
+                      moment(fechaHoraPago.toDate()).format(
+                        "YYYY-MM-DD HH:mm:ss"
+                      )
+                    ),
+                    clienteId,
+                    1,
+                    "N",
+                    "N",
+                    cobrador,
+                    234,
+                    null,
+                    cobradorId,
+                    "N",
+                    "N",
+                    "N",
+                    null,
+                    null,
+                    0,
+                    null,
+                    "CC",
+                    "N",
+                    "P",
+                    moment().format("YYYY-MM-DD"),
+                    "N",
+                    "N",
+                    "PREIMP",
+                    "false",
+                    null,
+                    "N",
+                    moment().format("YYYY-MM-DD HH:mm:ss"),
+                    null,
+                    "N",
+                    null,
+                    null,
+                    "N",
+                    "N",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "COBRANZA EN RUTA 2.0",
+                    moment().format("YYYY-MM-DD HH:mm:ss"),
+                    null,
+                    "COBRANZA EN RUTA 2.0",
+                    moment().format("YYYY-MM-DD HH:mm:ss"),
+                    "COBRANZA EN RUTA 2.0",
+                    null,
+                    null,
+                    null,
+                    lat.toString(),
+                    lng.toString(),
+                    null,
+                  ];
+
+                  transaction.query(
+                    QUERTY_INSERT_PAGO,
+                    params,
+                    (err, result) => {
+                      if (err) {
+                        console.error(err);
+                        transaction.rollback();
+                      }
+                      console.log("result: ", result);
+                      const idDoctoCCID = (result as any).DOCTO_CC_ID;
+
+                      let params = [
+                        -1,
+                        idDoctoCCID,
+                        moment().format("YYYY-MM-DD"),
+                        "N",
+                        "N",
+                        "N",
+                        "C",
+                        idDoctoCCID,
+                        importe,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                      ];
+                      transaction.query(
+                        QUERY_INSERT_PAGO_IMPORTES,
+                        params,
+                        (err, result) => {
+                          if (err) {
+                            console.error(err);
+                            transaction.rollback();
+                          }
+                          transaction.commit((err) => {
+                            if (err) {
+                              console.error(err);
+                              transaction.rollback();
+                            }
+                          });
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
     });
-    console.log(result[0].DOCTO_CC_ID);
-    await query({
-      sql: QUERY_INSERT_PAGO_IMPORTES,
-      params: [
-        -1,
-        result[0].DOCTO_CC_ID,
-        moment().format("YYYY-MM-DD"),
-        "N",
-        "N",
-        "N",
-        "C",
-        result[0].DOCTO_CC_ID,
-        importe,
-        0,
-        0,
-        0,
-        0,
-        0,
-      ],
-    });
-    return true;
   } catch (err) {
     console.log(err);
   }

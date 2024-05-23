@@ -1,6 +1,6 @@
 import Firebird from "node-firebird";
 
-const pool = Firebird.pool(5, {
+export const pool = Firebird.pool(5, {
   // host: "SERVERM",
   // database: "C:\\Microsip datos\\MUEBLERA_SNP.fdb",
   port: 3050,
