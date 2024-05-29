@@ -359,7 +359,8 @@ const listeningPagos = () => {
             data.COBRADOR_ID,
             data.LAT,
             data.LNG,
-            data.IMPORTE
+            data.IMPORTE,
+            data.DOCTO_CC_ACR_ID
           );
         }
       });
@@ -373,7 +374,8 @@ const insertDataToFirebird = async (
   cobradorId: number,
   lat: number,
   lng: number,
-  importe: number
+  importe: number,
+  doctoAcrId: number
 ) => {
   try {
     pool.get((err, db) => {
@@ -424,7 +426,7 @@ const insertDataToFirebird = async (
                     clienteId,
                     1,
                     "N",
-                    "N",
+                    "S",
                     cobrador,
                     234,
                     null,
@@ -437,9 +439,9 @@ const insertDataToFirebird = async (
                     0,
                     null,
                     "CC",
-                    "N",
                     "P",
-                    moment().format("YYYY-MM-DD"),
+                    "P",
+                    null,
                     "N",
                     "N",
                     "PREIMP",
@@ -491,7 +493,7 @@ const insertDataToFirebird = async (
                         "S",
                         "N",
                         "R",
-                        idDoctoCCID,
+                        doctoAcrId,
                         importe,
                         0,
                         0,
