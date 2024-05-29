@@ -170,10 +170,14 @@ const getVentasById = (ventasId: string) => {
   });
 };
 
-const getVentasProductosByFolio = (folios: string[]) => {
-  return new Promise<any[]>(async (resolve, reject) => {
-    const foliosStr = QUERY_GET_ARTICULOS_BY_FOLIO(folios.join("','"));
-    const productos = await query({
+const getVentasProductosByFolio = async (folios: string[]): Promise<any[]> => {
+  let productos: any[] = [];
+
+  const getProductosByFolios = async (
+    foliosBatch: string[]
+  ): Promise<any[]> => {
+    const foliosStr = QUERY_GET_ARTICULOS_BY_FOLIO(foliosBatch.join("','"));
+    const productosList = await query({
       sql: foliosStr,
       params: [],
       converters: [
@@ -183,11 +187,22 @@ const getVentasProductosByFolio = (folios: string[]) => {
         },
       ],
     });
-    // const productos = await getProductosByVentaId(
-    //   ventas.map((venta) => venta.DOCTO_PV_ID)
-    // );
-    resolve(productos);
-  });
+    return productosList;
+  };
+
+  if (folios.length < 1500) {
+    return await getProductosByFolios(folios);
+  }
+
+  let i = 0;
+  while (i < folios.length) {
+    const foliosBatch = folios.slice(i, i + 1500);
+    const productosBatch = await getProductosByFolios(foliosBatch);
+    productos = productos.concat(productosBatch);
+    i += 1500;
+  }
+
+  return productos;
 };
 
 // const getProductosByVentaId = (ventaIds: number[]) => {
@@ -263,7 +278,13 @@ const getAllVentasWithCliente = () => {
  */
 const setAllVentasWithCliente = async () => {
   const ventas = await getAllVentasWithCliente();
+  const folios = ventas.map((venta) => venta.FOLIO as string);
+  const productos = await getVentasProductosByFolio(folios);
+  console.log("Productos: ", productos.length);
+  console.log("Ventas: ", ventas.length);
+
   const collectionRef = db.collection("ventas");
+  const collectionRefProductos = db.collection("ventas_productos");
   const BATCH_SIZE = 500;
   let batch = db.batch();
   let batchCount = 0;
@@ -283,6 +304,29 @@ const setAllVentasWithCliente = async () => {
       console.log(`Batch ${Math.floor(i / BATCH_SIZE) + 1} committed`);
       batch = db.batch();
       batchCount = 0;
+
+      // Esperar un poco antes de continuar con el siguiente lote
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 segundo de pausa
+    }
+  }
+
+  let batchProductos = db.batch();
+  let batchCountProductos = 0;
+
+  for (let i = 0; i < productos.length; i++) {
+    const item = productos[i];
+    const docRef = collectionRefProductos.doc(); // Genera una nueva referencia de documento
+    batchProductos.set(docRef, item);
+    batchCountProductos++;
+
+    if (batchCountProductos === BATCH_SIZE) {
+      // Commit the batch
+      await batchProductos.commit();
+      console.log(
+        `Batch productos ${Math.floor(i / BATCH_SIZE) + 1} committed`
+      );
+      batchProductos = db.batch();
+      batchCountProductos = 0;
 
       // Esperar un poco antes de continuar con el siguiente lote
       await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 segundo de pausa
@@ -444,9 +488,9 @@ const insertDataToFirebird = async (
                         idDoctoCCID,
                         moment().format("YYYY-MM-DD"),
                         "N",
+                        "S",
                         "N",
-                        "N",
-                        "C",
+                        "R",
                         idDoctoCCID,
                         importe,
                         0,
