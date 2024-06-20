@@ -17,6 +17,7 @@ import {
   QUERY_GET_CLAVE_CLIENTE,
   QUERY_INSERT_PAGO_IMPORTES,
   QUERY_UPDATE_FOLIO_CR,
+  QUERY_INSERT_FORMA_COBRO,
   // QUERY_GET_ARTICULOS_ITEMS_BY_VENTA_ID_PART_1,
   // QUERY_GET_ARTICULOS_ITEMS_BY_VENTA_ID_PART_2,
 } from "./queries";
@@ -346,23 +347,25 @@ const listeningPagos = () => {
   const currentDate = moment();
   console.log("Listening pagos");
   db.collection("pagos")
-    .where("FECHA_HORA_PAGO", ">", currentDate.toDate())
+    .where("FECHA_HORA_PAGO", ">=", currentDate.subtract(1, "minute"))
     .onSnapshot((snapshot) => {
-      snapshot.docChanges().forEach(async (change) => {
-        if (change.type === "added") {
-          const data = change.doc.data();
-          console.log(data);
-          await insertDataToFirebird(
-            data.CLIENTE_ID,
-            data.FECHA_HORA_PAGO,
-            data.COBRADOR,
-            data.COBRADOR_ID,
-            data.LAT,
-            data.LNG,
-            data.IMPORTE,
-            data.DOCTO_CC_ACR_ID
-          );
-        }
+
+        snapshot.docChanges().forEach(async(change) => {
+          if(change.type === "added") {
+            const data = change.doc.data()
+            console.log(data);
+            await insertDataToFirebird(
+              data.CLIENTE_ID,
+              data.FECHA_HORA_PAGO,
+              data.COBRADOR,
+              data.COBRADOR_ID,
+              data.LAT,
+              data.LNG,
+              data.IMPORTE,
+              data.DOCTO_CC_ACR_ID,
+              data.FORMA_COBRO_ID
+            );
+          }
       });
     });
 };
@@ -375,12 +378,14 @@ const insertDataToFirebird = async (
   lat: number,
   lng: number,
   importe: number,
-  doctoAcrId: number
+  doctoAcrId: number,
+  formaCobroId: number
 ) => {
   try {
     pool.get((err, db) => {
       if (err) {
         console.error(err);
+        db.detach()
         return;
       }
       db.transaction(
@@ -389,25 +394,28 @@ const insertDataToFirebird = async (
           transaction.query(
             QUERY_GET_NEXT_FOLIO_CR,
             [clienteId],
-            (err, result) => {
+            async(err, result: any) => {
               console.log("result: ", result);
-              const folioNumber = result[0].FOLIO;
+              const folioNumber = result.FOLIO_TEMP;
               if (err) {
+                console.log("Entrando al error en el folio temporal")
                 console.error(err);
                 transaction.rollback();
+                db.detach()
               }
-              transaction.query(
-                QUERY_UPDATE_FOLIO_CR,
-                [],
-                async (err, result) => {
-                  if (err) {
-                    console.error(err);
-                    transaction.rollback();
-                  }
-
-                  const claveCliente = await getClaveCliente(clienteId);
-                  const folio = "CR" + folioNumber;
-
+                  // const claveCliente = await getClaveCliente(clienteId);
+                  transaction.query(
+                    QUERY_GET_CLAVE_CLIENTE,
+                    [clienteId],
+                    (err, result) => {
+                      if (err) {
+                        console.log(err)
+                        transaction.rollback()
+                        db.detach()
+                      }
+                      const claveCliente = result[0].CLAVE_CLIENTE || ""
+                    
+                  const folio = "Z" + folioNumber;
                   const params = [
                     -1,
                     87327,
@@ -481,8 +489,8 @@ const insertDataToFirebird = async (
                       if (err) {
                         console.error(err);
                         transaction.rollback();
+                        db.detach()
                       }
-                      console.log("result: ", result);
                       const idDoctoCCID = (result as any).DOCTO_CC_ID;
 
                       let params = [
@@ -508,20 +516,44 @@ const insertDataToFirebird = async (
                           if (err) {
                             console.error(err);
                             transaction.rollback();
+                            db.detach()
                           }
-                          transaction.commit((err) => {
+                          const params = [
+                            -1,
+                            "DOCTOS_CC",
+                            idDoctoCCID,
+                            formaCobroId,
+                            "",
+                            "CC",
+                            "",
+                            0
+                          ]
+                          transaction.query(QUERY_INSERT_FORMA_COBRO, params, (err, result) => {
                             if (err) {
                               console.error(err);
                               transaction.rollback();
+                              db.detach()
                             }
-                          });
+                            transaction.commit((err) => {
+                              if (err) {
+                                console.error(err);
+                                transaction.rollback();
+                                db.detach()
+                                return
+                              }
+                              console.log("Pago insertado con exito")
+                              db.detach()
+                            });
+                          })
                         }
                       );
                     }
                   );
                 }
-              );
-            }
+                )
+                }
+                
+              
           );
         }
       );
