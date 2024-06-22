@@ -18,10 +18,15 @@ import {
   QUERY_INSERT_PAGO_IMPORTES,
   QUERY_UPDATE_FOLIO_CR,
   QUERY_INSERT_FORMA_COBRO,
+  QUERY_GET_PAGO,
   // QUERY_GET_ARTICULOS_ITEMS_BY_VENTA_ID_PART_1,
   // QUERY_GET_ARTICULOS_ITEMS_BY_VENTA_ID_PART_2,
 } from "./queries";
 import { Timestamp } from "../../repositories/firebase";
+import { createCanvas } from "canvas";
+import fs from "fs";
+import path from "path";
+import { create, Whatsapp } from "venom-bot";
 
 interface IGetVentasByClienteStore {
   clienteId: number;
@@ -537,7 +542,7 @@ const insertDataToFirebird = async (
                                 transaction.rollback();
                                 db.detach();
                               }
-                              transaction.commit((err) => {
+                              transaction.commit(async (err) => {
                                 if (err) {
                                   console.error(err);
                                   transaction.rollback();
@@ -545,6 +550,75 @@ const insertDataToFirebird = async (
                                   return;
                                 }
                                 console.log("Pago insertado con exito", folio);
+
+                                /**
+                                 * SELECT
+                                    dc.DOCTO_CC_ID,
+                                    dc.FOLIO,
+                                    dc.FECHA,
+                                    dc.IMPORTE_COBRO,
+                                    dc.FECHA_HORA_PAGO,
+                                    c.CLIENTE_ID,
+                                    c.NOMBRE,
+                                    c.CONTACTO1,
+                                    c.CONTACTO2,
+                                    (SELECT SUM(IMPORTE + IMPUESTO) FROM IMPORTES_DOCTOS_CC WHERE DOCTO_CC_ID = dc.DOCTO_CC_ID AND CANCELADO = 'N') AS IMPORTE_TOTAL,
+                                    (SELECT SUM(IMPORTE + IMPUESTO) FROM IMPORTES_DOCTOS_CC WHERE DOCTO_CC_ID = dc.DOCTO_CC_ID AND APLICADO = 'S' AND CANCELADO = 'N') AS IMPORTE_APLICADO,
+                                    (SELECT SUM(IMPORTE + IMPUESTO) - SUM(IMPORTE + IMPUESTO) FROM IMPORTES_DOCTOS_CC WHERE DOCTO_CC_ID = dc.DOCTO_CC_ID AND CANCELADO = 'N') AS SALDO_RESTANTE
+                                  FROM
+                                    DOCTOS_CC dc
+                                    JOIN CLIENTES c ON dc.CLIENTE_ID = c.CLIENTE_ID
+                                  WHERE
+                                    dc.DOCTO_CC_ID = ?;*/
+                                const pago = await getPago(idDoctoCCID);
+                                console.log("Pago: ", pago);
+                                // Crear el ticket
+                                createTicket(pago).then((ticketPath) => {
+                                  // Enviar el ticket por WhatsApp
+                                  create(
+                                    "sessionName",
+                                    (base64Qr, asciiQR, attempts, urlCode) => {
+                                      console.log(asciiQR);
+                                    },
+                                    (statusFind) => {
+                                      console.log(statusFind);
+                                    },
+                                    { headless: "new" }
+                                  )
+                                    .then((client) => start(client, ticketPath))
+                                    .catch((error) => {
+                                      console.error(error);
+                                    });
+
+                                  const start = (
+                                    client: Whatsapp,
+                                    ticketPath: string
+                                  ) => {
+                                    const phoneNumber = "522381863330";
+                                    const caption =
+                                      "¡Gracias por tu compra! Aquí tienes tu ticket de compra.";
+
+                                    client
+                                      .sendImage(
+                                        `${phoneNumber}@c.us`,
+                                        ticketPath,
+                                        "ticket",
+                                        caption
+                                      )
+                                      .then((result) => {
+                                        console.log(
+                                          "Ticket enviado con éxito:",
+                                          result
+                                        );
+                                      })
+                                      .catch((error) => {
+                                        console.error(
+                                          "Error al enviar el ticket:",
+                                          error
+                                        );
+                                      });
+                                  };
+                                });
                                 db.detach();
                               });
                             }
@@ -563,6 +637,48 @@ const insertDataToFirebird = async (
   } catch (err) {
     console.log(err);
   }
+};
+
+// Función para crear el ticket
+async function createTicket(data: any) {
+  const width = 500;
+  const height = 300;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+
+  // Fondo gradient
+  const gradient = ctx.createLinearGradient(0, 0, width, 0);
+  gradient.addColorStop(0, "#ff7e5f");
+  gradient.addColorStop(1, "#feb47b");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  // Texto
+  ctx.font = "bold 30px sans-serif";
+  ctx.fillStyle = "#fff";
+  ctx.fillText("¡Gracias por tu compra!", 50, 50);
+
+  // Información de la compra
+  ctx.font = "20px sans-serif";
+  ctx.fillText(`Cliente: ${data.NOMBRE}`, 50, 100);
+  ctx.fillText(`Fecha: ${data.FECHA}`, 50, 130);
+  ctx.fillText(`Folio: ${data.FOLIO}`, 50, 160);
+  ctx.fillText(`Importe total: $${data.IMPORTE_TOTAL}`, 50, 190);
+
+  // Guardar la imagen en un archivo
+  const buffer = canvas.toBuffer("image/png");
+  const ticketPath = path.join(__dirname, "ticket.png");
+  fs.writeFileSync(ticketPath, buffer);
+
+  return ticketPath;
+}
+
+const getPago = async (doctoCCID: number) => {
+  const pago = await query({
+    sql: QUERY_GET_PAGO,
+    params: [doctoCCID],
+  });
+  return pago[0];
 };
 
 export default {
