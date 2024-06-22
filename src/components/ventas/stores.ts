@@ -296,6 +296,8 @@ const setAllVentasWithCliente = async () => {
     batch.set(docRef, {
       ...item,
       ESTADO_COBRANZA: "PENDIENTE",
+      DIA_COBRANZA: "DOMINGO",
+      DIA_TEMPORAL_COBRANZA: "",
     });
     batchCount++;
 
@@ -349,23 +351,22 @@ const listeningPagos = () => {
   db.collection("pagos")
     .where("FECHA_HORA_PAGO", ">=", currentDate.subtract(1, "minute"))
     .onSnapshot((snapshot) => {
-
-        snapshot.docChanges().forEach(async(change) => {
-          if(change.type === "added") {
-            const data = change.doc.data()
-            console.log(data);
-            await insertDataToFirebird(
-              data.CLIENTE_ID,
-              data.FECHA_HORA_PAGO,
-              data.COBRADOR,
-              data.COBRADOR_ID,
-              data.LAT,
-              data.LNG,
-              data.IMPORTE,
-              data.DOCTO_CC_ACR_ID,
-              data.FORMA_COBRO_ID
-            );
-          }
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === "added") {
+          const data = change.doc.data();
+          console.log(data);
+          await insertDataToFirebird(
+            data.CLIENTE_ID,
+            data.FECHA_HORA_PAGO,
+            data.COBRADOR,
+            data.COBRADOR_ID,
+            data.LAT,
+            data.LNG,
+            data.IMPORTE,
+            data.DOCTO_CC_ACR_ID,
+            data.FORMA_COBRO_ID
+          );
+        }
       });
     });
 };
@@ -385,7 +386,7 @@ const insertDataToFirebird = async (
     pool.get((err, db) => {
       if (err) {
         console.error(err);
-        db.detach()
+        db.detach();
         return;
       }
       db.transaction(
@@ -394,27 +395,26 @@ const insertDataToFirebird = async (
           transaction.query(
             QUERY_GET_NEXT_FOLIO_CR,
             [clienteId],
-            async(err, result: any) => {
+            async (err, result: any) => {
               console.log("result: ", result);
               const folioNumber = result.FOLIO_TEMP;
               if (err) {
-                console.log("Entrando al error en el folio temporal")
+                console.log("Entrando al error en el folio temporal");
                 console.error(err);
                 transaction.rollback();
-                db.detach()
+                db.detach();
               }
-                  // const claveCliente = await getClaveCliente(clienteId);
-                  transaction.query(
-                    QUERY_GET_CLAVE_CLIENTE,
-                    [clienteId],
-                    (err, result) => {
-                      if (err) {
-                        console.log(err)
-                        transaction.rollback()
-                        db.detach()
-                      }
-                      const claveCliente = result[0].CLAVE_CLIENTE || ""
-                    
+              transaction.query(
+                QUERY_GET_CLAVE_CLIENTE,
+                [clienteId],
+                (err, result) => {
+                  if (err) {
+                    console.log(err);
+                    transaction.rollback();
+                    db.detach();
+                  }
+                  const claveCliente = result[0].CLAVE_CLIENTE || "";
+
                   const folio = "Z" + folioNumber;
                   const params = [
                     -1,
@@ -489,7 +489,7 @@ const insertDataToFirebird = async (
                       if (err) {
                         console.error(err);
                         transaction.rollback();
-                        db.detach()
+                        db.detach();
                       }
                       const idDoctoCCID = (result as any).DOCTO_CC_ID;
 
@@ -516,7 +516,7 @@ const insertDataToFirebird = async (
                           if (err) {
                             console.error(err);
                             transaction.rollback();
-                            db.detach()
+                            db.detach();
                           }
                           const params = [
                             -1,
@@ -526,34 +526,36 @@ const insertDataToFirebird = async (
                             "",
                             "CC",
                             "",
-                            0
-                          ]
-                          transaction.query(QUERY_INSERT_FORMA_COBRO, params, (err, result) => {
-                            if (err) {
-                              console.error(err);
-                              transaction.rollback();
-                              db.detach()
-                            }
-                            transaction.commit((err) => {
+                            0,
+                          ];
+                          transaction.query(
+                            QUERY_INSERT_FORMA_COBRO,
+                            params,
+                            (err, result) => {
                               if (err) {
                                 console.error(err);
                                 transaction.rollback();
-                                db.detach()
-                                return
+                                db.detach();
                               }
-                              console.log("Pago insertado con exito")
-                              db.detach()
-                            });
-                          })
+                              transaction.commit((err) => {
+                                if (err) {
+                                  console.error(err);
+                                  transaction.rollback();
+                                  db.detach();
+                                  return;
+                                }
+                                console.log("Pago insertado con exito", folio);
+                                db.detach();
+                              });
+                            }
+                          );
                         }
                       );
                     }
                   );
                 }
-                )
-                }
-                
-              
+              );
+            }
           );
         }
       );
@@ -561,14 +563,6 @@ const insertDataToFirebird = async (
   } catch (err) {
     console.log(err);
   }
-};
-
-const getClaveCliente = async (clienteId: number) => {
-  const claveCliente = await query({
-    sql: QUERY_GET_CLAVE_CLIENTE,
-    params: [clienteId],
-  });
-  return claveCliente[0].CLAVE_CLIENTE || "";
 };
 
 export default {
