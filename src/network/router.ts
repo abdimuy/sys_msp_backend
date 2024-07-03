@@ -10,6 +10,7 @@ import ventas from "../components/ventas/network";
 import clientes from "../components/clientes/network";
 import rutas from "../components/rutas/network";
 import reportesPorRuta from "../components/reportePorRuta/network";
+import zonasCliente from "../components/zonasCliente/network";
 
 const appRouter = (server: Express) => {
   server.use("/", Home);
@@ -23,6 +24,7 @@ const appRouter = (server: Express) => {
   server.use("/clientes", clientes);
   server.use("/rutas", rutas);
   server.use("/reports_ruta", reportesPorRuta);
+  server.use("/zonas-cliente", zonasCliente);
 };
 
 export default appRouter;
