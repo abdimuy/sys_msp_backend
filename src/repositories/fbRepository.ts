@@ -1,17 +1,18 @@
 import Firebird from "node-firebird";
 
-export const pool = Firebird.pool(5, {
+export const pool = Firebird.pool(1000, {
   // host: "SERVERM",
-  // database: "C:\\Microsip datos\\MUEBLERA_SNP.fdb",
+  // database: "C:\\Microsip datos\\PRUEBA_ALDRICH.fdb",
+  database: "C:\\Microsip datos\\MUEBLERA_SNP.fdb",
   port: 3050,
   host: "localhost",
   // database: "C:\\dev\\MUEBLERA_SNP.fdb",
-  database: "C:\\Users\\abdid\\Documents\\MUEBLERA_SNP\\MUEBLERA_SNP.fdb",
+  // database: "C:\\Users\\abdid\\Documents\\MUEBLERA_SNP\\MUEBLERA_SNP.fdb",
   user: "SYSDBA",
   password: "masterkey",
 });
 
-interface IQuery {
+export interface IQuery {
   sql: string;
   params?: any[];
   converters?: IQueryConverter[];
@@ -24,11 +25,11 @@ export interface IQueryConverter {
 
 type ITypeToConvert = "buffer";
 
-export const query = ({
+export const query = <T>({
   sql,
   converters = [],
   params = [],
-}: IQuery): Promise<any[]> => {
+}: IQuery): Promise<T[]> => {
   return new Promise((resolve, reject) => {
     try {
       let result: any[];

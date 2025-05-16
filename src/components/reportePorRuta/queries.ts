@@ -85,18 +85,28 @@ FROM
 	    A.NUM_CTAS_COB
 	    FROM
 	    (
-	      SELECT
-	        CAST(
-	          CAST(
-	            CASE
-	              WHEN EXTRACT (MONTH FROM DOCTOS_CC.FECHA) = 1 AND EXTRACT (WEEK FROM DOCTOS_CC.FECHA) = 53 THEN EXTRACT (YEAR FROM DOCTOS_CC.FECHA) -1
-	              ELSE EXTRACT (YEAR FROM DOCTOS_CC.FECHA)
-	            END
-	            AS VARCHAR(50)
-	          )
-	          ||
-	          CAST(CASE EXTRACT(WEEKDAY FROM DOCTOS_CC.FECHA) WHEN 0 THEN EXTRACT(WEEK FROM DOCTOS_CC.FECHA) + 1 ELSE EXTRACT(WEEK FROM DOCTOS_CC.FECHA) END AS VARCHAR(50)
-	        ) AS INTEGER) AS FECHA_M,
+			SELECT
+			CAST(
+				CASE 
+					-- Si es la semana 53, que pase al año siguiente
+					WHEN EXTRACT(WEEK FROM DOCTOS_CC.FECHA) = 53 THEN EXTRACT(YEAR FROM DOCTOS_CC.FECHA) + 1
+					-- En caso contrario, se queda el año “normal”
+					ELSE EXTRACT(YEAR FROM DOCTOS_CC.FECHA)
+				END
+				AS VARCHAR(4)
+			)
+			||
+			CAST(
+				CASE 
+					-- Si es la semana 53, forzamos a semana 1
+					WHEN EXTRACT(WEEK FROM DOCTOS_CC.FECHA) = 53 THEN 1
+					-- Si el WEEKDAY = 0 (domingo en Firebird), sumamos 1 a la semana
+					WHEN EXTRACT(WEEKDAY FROM DOCTOS_CC.FECHA) = 0 THEN EXTRACT(WEEK FROM DOCTOS_CC.FECHA) + 1
+					-- Si no, tomamos la semana tal cual
+					ELSE EXTRACT(WEEK FROM DOCTOS_CC.FECHA)
+				END
+				AS VARCHAR(2)
+			) AS FECHA_M,
 			CLIENTES.ZONA_CLIENTE_ID,
 	  	  IMPORTES_DOCTOS_CC.DOCTO_CC_ACR_ID,
 	        SUM(IMPORTES_DOCTOS_CC.IMPORTE + IMPORTES_DOCTOS_CC.IMPUESTO) AS TOTAL_COBRADO,

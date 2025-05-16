@@ -20,4 +20,20 @@ router.get("/", (req, res) => {
     });
 });
 
+router.get("/update-zonas-clientes-firebase", (req, res) => {
+  controller
+    .updateZonasFirebase()
+    .then((result) => {
+      responses.success({ req, res, data: result });
+    })
+    .catch((err) => {
+      responses.error({
+        req,
+        res,
+        error: "Error al actualizar la zonas en firebase",
+        details: err,
+      });
+    });
+})
+
 export default router;

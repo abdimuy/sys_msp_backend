@@ -7,6 +7,7 @@ const getReportsRutas = () => {
   return new Promise(async (resolve, reject) => {
     try {
       const fechasUltDiezSemanas = calcFechasUltDiezSemanas();
+      console.log({fechasUltDiezSemanas})
       const fechaSemanaActual = moment().format("YYYYW");
       const [reportsPorRuta, numCtasRutas, porcentajesParcialidadRutas] =
         await Promise.all([
@@ -64,7 +65,7 @@ const getReportsRutas = () => {
 
 const calcFechasUltDiezSemanas = (): string => {
   const listDiezSemanas = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 1; i++) {
     listDiezSemanas.push(moment().subtract(i, "weeks").format("YYYYW"));
   }
   return listDiezSemanas.join(",");
