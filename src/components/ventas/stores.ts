@@ -1,7 +1,11 @@
 import moment, { Moment } from "moment";
 import "moment-timezone";
 import { query } from "../../repositories/connection";
-import { IQueryConverter, pool } from "../../repositories/fbRepository";
+import {
+  getDbConnectionAsync,
+  IQueryConverter,
+  queryAsync,
+} from "../../repositories/fbRepository";
 import Firebird from "node-firebird";
 import {
   QUERY_GET_VENTAS_BY_CLIENTE,
@@ -175,9 +179,7 @@ const getVentasById = (ventasId: string) => {
   });
 };
 
-const getProductosByFolios = async (
-  foliosBatch: string[]
-): Promise<any[]> => {
+const getProductosByFolios = async (foliosBatch: string[]): Promise<any[]> => {
   const foliosStr = QUERY_GET_ARTICULOS_BY_FOLIO(foliosBatch.join("','"));
   const productosList = await query({
     sql: foliosStr,
@@ -277,11 +279,14 @@ const getAllVentasWithCliente = () => {
   });
 };
 
-const getAllVentasWithClienteWithoutDate = (date: Moment = moment().day() === 4 ? moment() : moment().day(-3), zonaClienteId: number) => {
-  console.log(date.format('YYYY-MM-DD HH:mm:ss'))
-  const dateInit = date.format("YYYY-MM-DD HH:mm:ss")
+const getAllVentasWithClienteWithoutDate = (
+  date: Moment = moment().day() === 4 ? moment() : moment().day(-3),
+  zonaClienteId: number
+) => {
+  console.log(date.format("YYYY-MM-DD HH:mm:ss"));
+  const dateInit = date.format("YYYY-MM-DD HH:mm:ss");
   // const q = QUERY_GET_ALL_VENTAS_WITH_CLIENTE_WITHOUT_DATE(dateInit, 21571)
-  const q = QUERY_GET_ALL_VENTAS_WITH_CLIENTE_WITHOUT_DATE
+  const q = QUERY_GET_ALL_VENTAS_WITH_CLIENTE_WITHOUT_DATE;
   return new Promise<any[]>(async (resolve, reject) => {
     const numCtasRutas = await query({
       sql: q,
@@ -326,12 +331,12 @@ const getAllVentasWithClienteWithoutDate = (date: Moment = moment().day() === 4 
         },
         {
           column: "AVAL_O_RESPONSABLE",
-          type: 'buffer'
+          type: "buffer",
         },
         {
           column: "FREC_PAGO",
-          type: 'buffer'
-        }
+          type: "buffer",
+        },
       ],
     });
     resolve(numCtasRutas);
@@ -345,264 +350,6 @@ const getNextFolioCR = async (): Promise<string> => {
 
   // @ts-ignore
   return folio[0].FOLIO;
-};
-
-// const insertDataToFirebird = async (
-//   clienteId: number,
-//   fechaHoraPago: Timestamp,
-//   cobrador: string,
-//   cobradorId: number,
-//   lat: number,
-//   lng: number,
-//   importe: number,
-//   doctoAcrId: number,
-//   formaCobroId: number,
-//   doctoCCId: string
-// ) => {
-//   return new Promise(async (resolve, reject) => {
-//     const existPagoId = await controller.existUniqueIdPago(doctoCCId)
-//     if (existPagoId) {
-//       resolve("El pago ya existe")
-//       return
-//     }
-//     pool.get((err, db) => {
-//       if (err) {
-//         console.error(err);
-//         db.detach();
-//         reject(err)
-//         return;
-//       }
-//       db.transaction(
-//         Firebird.ISOLATION_READ_COMMITED,
-//         async (err, transaction) => {
-//           if (err) {
-//             console.error("err0", err);
-//             transaction.rollback();
-//             db.detach();
-//             reject(err)
-//             return
-//           }
-//           transaction.query(
-//             QUERY_GET_NEXT_FOLIO_CR,
-//             [clienteId],
-//             async (err, result: any) => {
-//               const folioNumber = result.FOLIO_TEMP;
-//               if (err) {
-//                 console.error("err1", err);
-//                 transaction.rollback();
-//                 db.detach();
-//                 reject(err)
-//                 return
-//               }
-//               transaction.query(
-//                 QUERY_GET_CLAVE_CLIENTE,
-//                 [clienteId],
-//                 (err, result) => {
-//                   if (err) {
-//                     console.log("err2", err);
-//                     transaction.rollback();
-//                     db.detach();
-//                     reject(err)
-//                     return 
-//                   }
-//                   const claveCliente = result[0].CLAVE_CLIENTE || "";
-
-//                   const folio = "Z" + folioNumber;
-                  
-//                   let conceptoCCID = 87327
-//                   if (formaCobroId === 137026) {
-//                     conceptoCCID = 27969
-//                   }
-
-//                   const params = [
-//                     -1,
-//                     conceptoCCID,
-//                     folio,
-//                     "R",
-//                     225490,
-//                     moment(fechaHoraPago.toDate()).format("YYYY-MM-DD"),
-//                     moment(fechaHoraPago.toDate()).add('10', "s").format("HH:mm:ss"),
-//                     claveCliente,
-//                     0,
-//                     moment().format(
-//                       moment(fechaHoraPago.toDate()).format(
-//                         "YYYY-MM-DD HH:mm:ss"
-//                       )
-//                     ),
-//                     clienteId,
-//                     1,
-//                     "N",
-//                     "S",
-//                     cobrador,
-//                     234,
-//                     null,
-//                     cobradorId,
-//                     "N",
-//                     "N",
-//                     "N",
-//                     null,
-//                     null,
-//                     0,
-//                     null,
-//                     "CC",
-//                     "P",
-//                     "P",
-//                     null,
-//                     "N",
-//                     "N",
-//                     "PREIMP",
-//                     "false",
-//                     null,
-//                     "N",
-//                     moment().format("YYYY-MM-DD HH:mm:ss"),
-//                     null,
-//                     "N",
-//                     null,
-//                     null,
-//                     "N",
-//                     "N",
-//                     null,
-//                     null,
-//                     null,
-//                     null,
-//                     null,
-//                     "COBRANZA EN RUTA 2.0",
-//                     moment().format("YYYY-MM-DD HH:mm:ss"),
-//                     null,
-//                     "COBRANZA EN RUTA 2.0",
-//                     moment().format("YYYY-MM-DD HH:mm:ss"),
-//                     "COBRANZA EN RUTA 2.0",
-//                     null,
-//                     null,
-//                     null,
-//                     lat.toString(),
-//                     lng.toString(),
-//                     null,
-//                   ];
-
-//                   transaction.query(
-//                     QUERTY_INSERT_PAGO,
-//                     params,
-//                     (err, result) => {
-//                       if (err) {
-//                         console.error("err3", err);
-//                         transaction.rollback();
-//                         db.detach();
-//                         reject(err)
-//                         return
-//                       }
-//                       const idDoctoCCID = (result as any).DOCTO_CC_ID;
-
-//                       let params = [
-//                         -1,
-//                         idDoctoCCID,
-//                         moment().format("YYYY-MM-DD"),
-//                         "N",
-//                         "S",
-//                         "P",
-//                         "R",
-//                         doctoAcrId,
-//                         importe,
-//                         0,
-//                         0,
-//                         0,
-//                         0,
-//                         0,
-//                       ];
-//                       transaction.query(
-//                         QUERY_INSERT_PAGO_IMPORTES,
-//                         params,
-//                         (err, result) => {
-//                           if (err) {
-//                             console.error("err4", err);
-//                             transaction.rollback();
-//                             db.detach();
-//                             reject(err)
-//                             return
-//                           }
-//                           const params = [
-//                             -1,
-//                             "DOCTOS_CC",
-//                             idDoctoCCID,
-//                             formaCobroId,
-//                             "",
-//                             "CC",
-//                             "",
-//                             0,
-//                           ];
-//                           transaction.query(
-//                             QUERY_INSERT_FORMA_COBRO,
-//                             params,
-//                             (err, result) => {
-//                               if (err) {
-//                                 console.error("err5", err);
-//                                 transaction.rollback();
-//                                 db.detach();
-//                                 reject(err)
-//                                 return
-//                               }
-
-//                               transaction.query(
-//                                 QUERY_SET_PAGO_RECIBIDO,
-//                                 [doctoCCId, idDoctoCCID, moment(fechaHoraPago.toDate()).format('YYYY-MM-DD HH:mm:ss')],
-//                                 (err, result) => {
-//                                   if (err) {
-//                                     console.error("err6", err);
-//                                     transaction.rollback();
-//                                     db.detach();
-//                                     reject(err)
-//                                     return
-//                                   }
-    
-//                                   transaction.commit(async (err) => {
-//                                     if (err) {
-//                                       console.error("err6", err);
-//                                       transaction.rollback();
-//                                       db.detach();
-//                                       reject(err)
-//                                       return;
-//                                     }
-//                                     console.log("Pago insertado con exito", folio);
-//                                     resolve(folio)
-//                                     db.detach();
-//                                     return
-//                                   }
-//                                 )
-//                               });
-//                             }
-//                           );
-//                         }
-//                       );
-//                     }
-//                   );
-//                 }
-//               );
-//             }
-//           );
-//         }
-//       );
-//     });
-//   })
-// };
-
-// Función para promisificar una consulta en la transacción
-const queryAsync = (transaction:  Firebird.Transaction, sql: string, params: any[]): Promise<any> => {
-  return new Promise((resolve, reject) => {
-    transaction.query(sql, params, (err, result) => {
-      if (err) return reject(err);
-      resolve(result);
-    });
-  });
-};
-
-// Suponiendo que también tienes promisificada la obtención de la conexión:
-const getDbConnectionAsync = (): Promise<Firebird.Database> => {
-  return new Promise((resolve, reject) => {
-    pool.get((err, db) => {
-      if (err) return reject(err);
-      resolve(db);
-    });
-  });
 };
 
 const insertDataToFirebird = async (
@@ -623,19 +370,25 @@ const insertDataToFirebird = async (
   }
   const db = await getDbConnectionAsync();
   // Inicia la transacción (asegúrate que exista una versión promisificada o la envuelvas en una promesa)
-  const transaction = await new Promise<Firebird.Transaction>((resolve, reject) => {
-    db.transaction(Firebird.ISOLATION_READ_COMMITED, (err, trans) => {
-      if (err) return reject(err);
-      resolve(trans);
-    });
-  });
+  const transaction = await new Promise<Firebird.Transaction>(
+    (resolve, reject) => {
+      db.transaction(Firebird.ISOLATION_READ_COMMITED, (err, trans) => {
+        if (err) return reject(err);
+        resolve(trans);
+      });
+    }
+  );
 
   try {
     // Ejecutar consultas secuencialmente
-    const resultFolio = await queryAsync(transaction, QUERY_GET_NEXT_FOLIO_CR, [clienteId]);
+    const resultFolio = await queryAsync(transaction, QUERY_GET_NEXT_FOLIO_CR, [
+      clienteId,
+    ]);
     const folioNumber = resultFolio.FOLIO_TEMP;
 
-    const resultClave = await queryAsync(transaction, QUERY_GET_CLAVE_CLIENTE, [clienteId]);
+    const resultClave = await queryAsync(transaction, QUERY_GET_CLAVE_CLIENTE, [
+      clienteId,
+    ]);
     const claveCliente = resultClave[0].CLAVE_CLIENTE || "";
     const folio = "Z" + folioNumber;
 
@@ -651,9 +404,7 @@ const insertDataToFirebird = async (
       claveCliente,
       0,
       moment().format(
-        moment(fechaHoraPago.toDate()).format(
-          "YYYY-MM-DD HH:mm:ss"
-        )
+        moment(fechaHoraPago.toDate()).format("YYYY-MM-DD HH:mm:ss")
       ),
       clienteId,
       1,
@@ -706,7 +457,11 @@ const insertDataToFirebird = async (
       null,
     ];
 
-    const resultPago = await queryAsync(transaction, QUERTY_INSERT_PAGO, paramsPago);
+    const resultPago = await queryAsync(
+      transaction,
+      QUERTY_INSERT_PAGO,
+      paramsPago
+    );
     const idDoctoCCID = resultPago.DOCTO_CC_ID;
 
     const paramsImporte = [
@@ -742,7 +497,7 @@ const insertDataToFirebird = async (
     await queryAsync(transaction, QUERY_SET_PAGO_RECIBIDO, [
       doctoCCId,
       idDoctoCCID,
-      moment(fechaHoraPago.toDate()).format("YYYY-MM-DD HH:mm:ss")
+      moment(fechaHoraPago.toDate()).format("YYYY-MM-DD HH:mm:ss"),
     ]);
 
     // Commit de la transacción
@@ -763,7 +518,6 @@ const insertDataToFirebird = async (
     throw error;
   }
 };
-
 
 // Función para crear el ticket
 // async function createTicket(data: any) {
@@ -814,40 +568,40 @@ const getVentasByZona = async (zonaClienteId: number) => {
     converters: [
       {
         column: "FOLIO",
-        type: 'buffer'
-      }, 
+        type: "buffer",
+      },
       {
         column: "RUTA",
-        type: 'buffer'
-      }, 
+        type: "buffer",
+      },
       {
         column: "DOMICILIO",
-        type: 'buffer'
-      }, 
+        type: "buffer",
+      },
       {
         column: "LOCALIDAD",
-        type: 'buffer'
-      }, 
+        type: "buffer",
+      },
       {
         column: "VENDEDOR_1",
-        type: 'buffer'
-      }, 
+        type: "buffer",
+      },
       {
         column: "VENDEDOR_2",
-        type: 'buffer'
-      }, 
+        type: "buffer",
+      },
       {
         column: "VENDEDOR_3",
-        type: 'buffer'
-      }, 
+        type: "buffer",
+      },
       {
         column: "FREC_PAGO",
-        type: 'buffer'
-      }, 
-    ]
-  })
-  return ventas
-}
+        type: "buffer",
+      },
+    ],
+  });
+  return ventas;
+};
 
 export default {
   ventasByCliente: getVentasByCliente,
@@ -859,5 +613,5 @@ export default {
   getAllVentasWithClienteWithoutDate,
   insertDataToFirebird,
   getProductosByFolios,
-  getVentasByZona: getVentasByZona
+  getVentasByZona: getVentasByZona,
 };

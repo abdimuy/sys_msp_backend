@@ -11,12 +11,13 @@ import clientes from "../components/clientes/network";
 import rutas from "../components/rutas/network";
 import reportesPorRuta from "../components/reportePorRuta/network";
 import zonasCliente from "../components/zonasCliente/network";
-import visitas from "../components/visitas/network"
-import pagos from "../components/pagos/newtwork"
-import sincronizarAMongo from '../components/sincronizarAMongo/network'
-import garantias from "../components/garantias/network"
+import visitas from "../components/visitas/network";
+import pagos from "../components/pagos/newtwork";
+import sincronizarAMongo from "../components/sincronizarAMongo/network";
+import garantias from "../components/garantias/network";
 
 const appRouter = (server: Express) => {
+  server.use("/garantias", garantias);
   server.use("/", Home);
   server.use("/almacenes", almacenes);
   server.use("/movimientos", movimientos);
@@ -29,10 +30,9 @@ const appRouter = (server: Express) => {
   server.use("/rutas", rutas);
   server.use("/reports_ruta", reportesPorRuta);
   server.use("/zonas-cliente", zonasCliente);
-  server.use("/visitas", visitas)
-  server.use("/pagos", pagos)
-  server.use("/sync", sincronizarAMongo)
-  server.use("/garantias", garantias)
+  server.use("/visitas", visitas);
+  server.use("/pagos", pagos);
+  server.use("/sync", sincronizarAMongo);
 };
 
 export default appRouter;

@@ -4,24 +4,23 @@ import cors from "cors";
 import { connectToMongo } from "./repositories/mongoConnection";
 import { syncInitialData } from "./components/sincronizarAMongo/store";
 import store from "./components/pagos/store";
-import path from "path"
+import path from "path";
 
 const app = express();
 
 // __dirname existe en CommonJS y apunta a la carpeta de este archivo
-const uploadsDir = path.join(__dirname, '..', 'uploads');
+const uploadsDir = path.join(__dirname, "..", "uploads");
 
 // 1. Servir la carpeta 'uploads' en la URL '/uploads'
-app.use('/uploads', express.static(uploadsDir));
-
+app.use("/uploads", express.static(uploadsDir));
 
 (async () => {
   try {
     const db = await connectToMongo();
-    console.log('La conexión a MongoDB se realizó correctamente.');
+    console.log("La conexión a MongoDB se realizó correctamente.");
     // Aquí puedes iniciar tu servidor o ejecutar consultas usando "db"
   } catch (error) {
-    console.error('No se pudo conectar a MongoDB:', error);
+    console.error("No se pudo conectar a MongoDB:", error);
   }
 })();
 
@@ -30,13 +29,16 @@ app.use('/uploads', express.static(uploadsDir));
 //   store.syncChangesToMongo();
 // })
 
+setInterval(store.syncChangesToMongo, 30000);
+store.syncChangesToMongo();
 
-//Descomentar esta parte
-// setInterval(store.syncChangesToMongo, 30000);
-// store.syncChangesToMongo();
+import garantias from "./components/garantias/network";
 
 app.use(cors());
-app.use(express.json());
+
+app.use("/garantias", garantias);
 router(app);
+
+app.use(express.json());
 
 export default app;

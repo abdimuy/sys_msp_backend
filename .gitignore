@@ -4,3 +4,5 @@ package-build/
 serviceAccountKey.json
 tokens/
 data
+
+uploads/
