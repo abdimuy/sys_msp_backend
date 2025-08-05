@@ -47,8 +47,18 @@ app.use("/uploads", express.static(uploadsDir));
 //   store.syncChangesToMongo();
 // })
 
-setInterval(store.syncChangesToMongo, 30000);
+// Configuración mejorada de sincronización
+const SYNC_INTERVAL = 30000; // 30 segundos
+
+// Ejecutar sincronización inicial
 store.syncChangesToMongo();
+
+// Configurar intervalo de sincronización
+setInterval(() => {
+  store.syncChangesToMongo();
+}, SYNC_INTERVAL);
+
+console.log(`Sincronización automática configurada cada ${SYNC_INTERVAL / 1000} segundos`);
 
 import garantias from "./components/garantias/network";
 

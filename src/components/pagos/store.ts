@@ -189,12 +189,13 @@ const getPagosByVentaIdsMongo = async (ventasIds: number[]) => {
     return pagos
 }
 
-async function getUnprocessedChanges(): Promise<any[]> {
+async function getUnprocessedChanges(limit: number = 500): Promise<any[]> {
   return new Promise((resolve, reject) => {
     const sql = `
-      SELECT LOG_ID, TABLE_NAME, RECORD_ID, OPERATION, CHANGE_TIMESTAMP
+      SELECT FIRST ${limit} LOG_ID, TABLE_NAME, RECORD_ID, OPERATION, CHANGE_TIMESTAMP
       FROM MSP_CHANGE_LOG
       WHERE PROCESSED = 0
+      ORDER BY CHANGE_TIMESTAMP
     `;
     
     resolve(
@@ -269,53 +270,58 @@ async function getRecordFromFirebird(table: string, recordId: string | number): 
   });
 }
 
+let isSyncing = false;
+
 async function syncChangesToMongo() {
+  if (isSyncing) {
+    console.log('⚠️  Sincronización ya en proceso, saltando esta ejecución...');
+    return;
+  }
+  
   try {
-    // Obtener cambios no procesados
-    const changes = await getUnprocessedChanges();
-    // console.log(`Cambios sin procesar: ${changes.length}`);
+    isSyncing = true;
+    
+    const changes = await getUnprocessedChanges(500);
     if (changes.length === 0) {
-      // console.log('No hay cambios para procesar.');
+      isSyncing = false;
       return;
     }
-    console.log(`Detectados ${changes.length} cambios.`);
+    
+    console.log(`\nSincronizando ${changes.length} cambios...`);
+    const startTime = Date.now();
 
     const db = await connectToMongo();
 
-    // Agrupar cambios por clave compuesta: TABLE_NAME + RECORD_ID
-    const changesByRecord = new Map<string, any[]>();
+    const changesByTable = new Map<string, {
+      records: Map<string, any>,
+      logIds: number[]
+    }>();
+
     for (const change of changes) {
-      const key = `${change.TABLE_NAME}_${change.RECORD_ID}`;
-      if (!changesByRecord.has(key)) {
-        changesByRecord.set(key, []);
+      const { TABLE_NAME, RECORD_ID, LOG_ID, OPERATION, CHANGE_TIMESTAMP } = change;
+      
+      if (!changesByTable.has(TABLE_NAME)) {
+        changesByTable.set(TABLE_NAME, {
+          records: new Map(),
+          logIds: []
+        });
       }
-      changesByRecord.get(key)!.push(change);
+      
+      const tableData = changesByTable.get(TABLE_NAME)!;
+      const recordKey = `${RECORD_ID}_${OPERATION}`;
+      
+      if (!tableData.records.has(recordKey) || 
+          new Date(CHANGE_TIMESTAMP) > new Date(tableData.records.get(recordKey).CHANGE_TIMESTAMP)) {
+        tableData.records.set(recordKey, change);
+      }
+      
+      tableData.logIds.push(LOG_ID);
     }
 
-    // Procesar cada grupo (cada registro) tomando solo la última operación
-    for (const [key, group] of changesByRecord.entries()) {
-      // Ordenar el grupo por CHANGE_TIMESTAMP y tomar la última operación
-      group.sort(
-        (a, b) =>
-          new Date(a.CHANGE_TIMESTAMP).getTime() -
-          new Date(b.CHANGE_TIMESTAMP).getTime()
-      );
-      const lastChange = group[group.length - 1];
-      const { LOG_ID, TABLE_NAME, RECORD_ID, OPERATION } = lastChange;
-      // console.log(
-      //   `Procesando grupo ${key}: [${TABLE_NAME}] ${OPERATION} - ID: ${RECORD_ID}`
-      // );
-
-      // Definir el nombre de la colección en Mongo según la tabla
+    for (const [TABLE_NAME, tableData] of changesByTable.entries()) {
       const collectionName = TABLE_NAME.toLowerCase();
       const collection = db.collection(collectionName);
-      const idValues: { [key: string]: string | number } = {
-        doctos_cc: Number(RECORD_ID),
-        importes_doctos_cc: Number(RECORD_ID),
-        msp_pagos_recibidos: RECORD_ID,
-        formas_cobro_doctos: Number(RECORD_ID),
-        clientes: Number(RECORD_ID)
-      };
+      
       const idFieldNames: { [key: string]: string } = {
         doctos_cc: 'DOCTO_CC_ID',
         importes_doctos_cc: 'IMPTE_DOCTO_CC_ID',
@@ -325,44 +331,133 @@ async function syncChangesToMongo() {
       };
       const idFieldName = idFieldNames[collectionName];
 
-      if (OPERATION === 'DELETE') {
-        // Eliminar el documento en Mongo
-        await collection.deleteOne({ [idFieldName]: idValues[collectionName] });
-        console.log(
-          `Eliminado ${collectionName} con ID: ${idValues[collectionName]}`
-        );
-      } else {
-        // Para INSERT o UPDATE, obtener el registro actualizado desde Firebird
-        const record = await getRecordFromFirebird(TABLE_NAME, idValues[collectionName]);
-        // console.log('Registro obtenido:', record);
-        if (record) {
-          // Se asume que getRecordFromFirebird devuelve un array y se toma el primer elemento
-          // console.log({record: record[0]})
-          await collection.updateOne(
-            { [idFieldName]: idValues[collectionName] },
-            { $set: record[0] },
-            { upsert: true }
-          );
-          // console.log(
-          //   `Actualizado/inserto en ${collectionName} con ID: ${idValues[collectionName]}`
-          // );
+      const deleteOps: any[] = [];
+      const upsertRecordIds: (string | number)[] = [];
+      const operations = Array.from(tableData.records.values());
+
+      for (const op of operations) {
+        const recordId = ['msp_pagos_recibidos'].includes(collectionName) 
+          ? op.RECORD_ID 
+          : Number(op.RECORD_ID);
+
+        if (op.OPERATION === 'DELETE') {
+          deleteOps.push(recordId);
         } else {
-          console.warn(
-            `No se encontró registro en ${TABLE_NAME} con ID: ${idValues[collectionName]}`
-          );
+          upsertRecordIds.push(recordId);
         }
       }
 
-      // Marcar todos los cambios del grupo como procesados
-      for (const change of group) {
-        await markChangeAsProcessed(change.LOG_ID);
+      if (deleteOps.length > 0) {
+        try {
+          const result = await collection.deleteMany({
+            [idFieldName]: { $in: deleteOps }
+          });
+          if (result.deletedCount > 0) {
+            console.log(`${collectionName}: ${result.deletedCount} eliminados`);
+          }
+        } catch (error) {
+          console.error(`Error al eliminar registros de ${collectionName}:`, error);
+        }
+      }
+
+      const BATCH_SIZE = 100;
+      let totalProcessed = 0;
+      const totalToProcess = upsertRecordIds.length;
+      
+      for (let i = 0; i < upsertRecordIds.length; i += BATCH_SIZE) {
+        const batchIds = upsertRecordIds.slice(i, i + BATCH_SIZE);
+        const bulkOps: any[] = [];
+        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(totalToProcess / BATCH_SIZE);
+        
+
+        for (const recordId of batchIds) {
+          try {
+            const records = await getRecordFromFirebird(TABLE_NAME, recordId);
+            if (records && records[0]) {
+              bulkOps.push({
+                updateOne: {
+                  filter: { [idFieldName]: recordId },
+                  update: { $set: records[0] },
+                  upsert: true
+                }
+              });
+            }
+          } catch (error) {
+            console.error(`Error al obtener registro ${TABLE_NAME} ID: ${recordId}`, error);
+          }
+        }
+
+        if (bulkOps.length > 0) {
+          try {
+            const result = await collection.bulkWrite(bulkOps, { ordered: false });
+            totalProcessed += result.upsertedCount + result.modifiedCount;
+            if (batchNumber === totalBatches || result.upsertedCount > 0) {
+              console.log(
+                `${collectionName}: Lote ${batchNumber}/${totalBatches} - ` +
+                `${result.upsertedCount} insertados, ${result.modifiedCount} actualizados`
+              );
+            }
+          } catch (bulkError: any) {
+            if (bulkError.code === 11000) {
+              console.error(`${collectionName}: Error de clave duplicada en batch`);
+            } else if (bulkError.writeErrors && bulkError.writeErrors.length > 0) {
+              console.error(`${collectionName}: ${bulkError.writeErrors.length} errores en batch`);
+              bulkError.writeErrors.slice(0, 5).forEach((err: any) => {
+                console.error(`Error en documento: ${JSON.stringify(err)}`);
+              });
+            } else {
+              console.error(`${collectionName}: Error en batch:`, bulkError.message || bulkError);
+            }
+            
+            if (bulkError.result) {
+              const { nInserted = 0, nUpserted = 0, nModified = 0 } = bulkError.result;
+              const successCount = nInserted + nUpserted + nModified;
+              totalProcessed += successCount;
+              if (successCount > 0) {
+                console.log(
+                  `${collectionName}: Lote ${batchNumber}/${totalBatches} con errores - ` +
+                  `${successCount} procesados`
+                );
+              }
+            }
+          }
+        }
+      }
+      
+      // Resumen final para esta tabla
+      if (totalProcessed > 0) {
+        console.log(`${collectionName}: ${totalProcessed} registros procesados`);
+      }
+
+      const MARK_BATCH_SIZE = 200;
+      for (let i = 0; i < tableData.logIds.length; i += MARK_BATCH_SIZE) {
+        const batchLogIds = tableData.logIds.slice(i, i + MARK_BATCH_SIZE);
+        await markChangesAsProcessedBatch(batchLogIds);
       }
     }
 
-    // console.log('Sincronización completada de grupos.');
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    console.log(`Sincronización completada en ${(duration / 1000).toFixed(1)}s`);
   } catch (error) {
     console.error('Error en la sincronización:', error);
+  } finally {
+    isSyncing = false;
   }
+}
+
+async function markChangesAsProcessedBatch(logIds: number[]): Promise<any> {
+  if (logIds.length === 0) return;
+  
+  return new Promise((resolve, reject) => {
+    const placeholders = logIds.map(() => '?').join(',');
+    const sql = `UPDATE MSP_CHANGE_LOG SET PROCESSED = 1 WHERE LOG_ID IN (${placeholders})`;
+    resolve(query({
+      sql,
+      params: logIds
+    }));
+  });
 }
 
 export default {
