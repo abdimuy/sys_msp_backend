@@ -1,12 +1,21 @@
-import store, { addGarantiaWithImages, FileWithPath } from "./store";
+import store, { addGarantiaWithImages, FileWithPath, addGarantiaEvento,
+  getEventosByGarantia, } from "./store";
 import {
   CreateGarantiaRequest,
   CreateImagenGarantiaRequest,
   GarantiaImageRow,
   GarantiaRow,
   UploadedFile,
+  AllowedEstados,
+  EstadoGarantia
 } from "./types";
 import { Request, Response } from "express";
+import responses from "../../network/responses";
+import handleError from "../../network/handleError";
+
+const getGarantiasActivas = async (): Promise<GarantiaRow[]> => {
+  return store.getGarantiasActivas();
+};
 
 const addGarantia = async (
   data: CreateGarantiaRequest
@@ -103,7 +112,226 @@ export async function createGarantiaWithImages(req: Request, res: Response) {
   }
 }
 
+export async function createGarantiaEvento(req: Request, res: Response) {
+  try {
+    const garantiaId = req.params.id
+    if (garantiaId == "") {
+      return responses.error({
+        req,
+        res,
+        status: 400,
+        error: 'ID de garantía inválido',
+        details: `Param id="${req.params.id}" no es un entero válido`
+      });
+    }
+
+    const { tipoEvento, fechaEvento, comentario, id } = req.body;
+
+    if (
+      typeof tipoEvento !== 'string' ||
+      !AllowedEstados.includes(tipoEvento as EstadoGarantia)
+    ) {
+      return responses.error({
+        req,
+        res,
+        status: 400,
+        error: 'tipoEvento inválido',
+        details: `Debe ser uno de: ${AllowedEstados.join(', ')}`
+      });
+    }
+
+    if (typeof fechaEvento !== 'string' || isNaN(Date.parse(fechaEvento))) {
+      return responses.error({
+        req,
+        res,
+        status: 400,
+        error: 'fechaEvento inválido',
+        details: `Valor recibido: "${fechaEvento}"`
+      });
+    }
+
+    const newEvent = await addGarantiaEvento(
+      id,
+      garantiaId,
+      tipoEvento as EstadoGarantia,
+      fechaEvento,
+      comentario ? String(comentario).toUpperCase() : undefined
+    );
+
+    return responses.success({
+      req,
+      res,
+      status: 201,
+      data: newEvent
+    });
+  } catch (err: any) {
+    handleError(err);
+    return responses.error({
+      req,
+      res,
+      status: 500,
+      error: 'Error interno al crear evento',
+      details: err.message
+    });
+  }
+}
+
+export async function listGarantiaEventos(req: Request, res: any) {
+  try {
+    const garantiaId = Number(req.params.id);
+    if (!Number.isInteger(garantiaId) || garantiaId <= 0) {
+      return responses.error({
+        req,
+        res,
+        status: 400,
+        error: 'ID de garantía inválido',
+        details: `Param id="${req.params.id}" no es un entero válido`
+      });
+    }
+
+    const events = await getEventosByGarantia(garantiaId);
+    return responses.success({
+      req,
+      res,
+      data: events
+    });
+  } catch (err: any) {
+    handleError(err);
+    return responses.error({
+      req,
+      res,
+      status: 500,
+      error: 'Error interno al listar eventos',
+      details: err.message
+    });
+  }
+}
+
+async function getEventosGarantiasActivas(req: Request, res: Response) {
+  try {
+    const events = await store.getEventosGarantiasActivas();
+    return responses.success({
+      req,
+      res,
+      data: events
+    });
+  } catch (err) {
+    handleError(err);
+    return responses.error({
+      req,
+      res,
+      status: 500,
+      error: 'Error interno al listar eventos',
+      details: err.message
+    });
+  }
+}
+
+async function getGarantiaById(req: Request, res: Response) {
+  const {
+    idGarantia
+  } = req.params
+  try {
+    const garantia = await store.getGarantiaById(Number(idGarantia));
+    return responses.success({
+      req,
+      res,
+      data: garantia
+    });
+  } catch (err) {
+    handleError(err);
+    return responses.error({
+      req,
+      res,
+      status: 500,
+      error: 'Error interno al obtener la garantia',
+      details: err.message
+    });
+  }
+}
+
+async function getImagesByGarantia(req: Request, res: Response) {
+  const {
+    garantiaId
+  } = req.params
+  try {
+    const garantia = await store.getImagesByGarantia(Number(garantiaId));
+    return responses.success({
+      req,
+      res,
+      data: garantia
+    });
+  } catch (err) {
+    handleError(err);
+    return responses.error({
+      req,
+      res,
+      status: 500,
+      error: 'Error interno al obtener las imagenes de la garantia',
+      details: err.message
+    });
+  }
+}
+
+const actualizarEstadoGarantiaController = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { estado } = req.body;
+
+  if (!id || isNaN(Number(id))) {
+    return responses.error({
+      req,
+      res,
+      status: 400,
+      error: 'ID inválido',
+      details: `Se recibió id = ${id}`
+    });
+  }
+
+  if (!estado || typeof estado !== 'string') {
+    return responses.error({
+      req,
+      res,
+      status: 400,
+      error: 'El estado es requerido y debe ser un string',
+      details: `estado recibido = ${estado}`
+    });
+  }
+
+  if (!AllowedEstados.includes(estado as any)) {
+    return responses.error({
+      req,
+      res,
+      status: 400,
+      error: `Estado no permitido: ${estado}`,
+      details: `Estado recibido no está en AllowedEstados`
+    });
+  }
+
+  try {
+    await store.actualizarEstadoGarantia(Number(id), estado);
+    return responses.success({
+      req,
+      res,
+      status: 200,
+      data: { mensaje: 'Estado actualizado correctamente' }
+    });
+  } catch (err: any) {
+    return responses.error({
+      req,
+      res,
+      status: 500,
+      error: 'Error interno al actualizar el estado',
+      details: err.message || 'Error desconocido'
+    });
+  }
+};
+
+
 export default {
   uploadGarantiaImages,
   addGarantia,
+  getGarantiasActivas,
+  getEventosGarantiasActivas,
+  getGarantiaById,
+  getImagesByGarantia
 };

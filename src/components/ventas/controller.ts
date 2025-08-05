@@ -6,6 +6,7 @@ import moment, { Moment } from "moment";
 import { SUBCONSUTA_GET_CLIENTES_ACTIVOS } from "./queries";
 import { Timestamp } from "firebase-admin/firestore";
 import pagosStore from "../pagos/store";
+import garantiasStore from '../garantias/store'
 
 const getVentasByCliente = (clienteId: number) => {
   return new Promise(async (resolve, reject) => {
@@ -277,10 +278,16 @@ const getVentasByZona = async (zonaId: number, dateInit: Moment) => {
 
   const productos = await store.getProductosByFolios(productosFolios)
 
+  const garantias = await garantiasStore.getGarantiasActivas()
+
+  const eventosGarantias = await garantiasStore.getEventosGarantiasActivas()
+
   return {
     ventas: ventasByZonaClienteSelected,
     pagos,
-    productos
+    productos,
+    garantias,
+    eventosGarantias
   }
 }
 
@@ -374,6 +381,24 @@ const getVentasByZonaCliente = async (zonaClienteId: number) => {
   return ventas
 }
 
+const getVentaById = (ventaId: number) => {
+  return new Promise((resolve, reject) => {
+    resolve(store.getVentaById(ventaId))
+  })
+}
+
+const getProductosByFolio = (folio: string) => {
+  return new Promise((resolve, reject) => {
+    store.getProductoByFolio(folio)
+      .then((products) => {
+        resolve(products)
+      })
+      .catch(err => {
+        reject("Error al obtener el producto por folio")
+      })
+  })
+}
+
 export default {
   getVentasByCliente,
   getVentasByRuta,
@@ -382,5 +407,7 @@ export default {
   getNextFolioCR,
   getVentasByZona,
   addPago,
-  getVentasByZonaCliente
+  getVentasByZonaCliente,
+  getVentaById,
+  getProductosByFolio
 };

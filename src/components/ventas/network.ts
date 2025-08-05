@@ -39,6 +39,25 @@ router.get("/ruta/:numRuta", (req, res) => {
 //     });
 // });
 
+router.get("/product/folio/:folio", (req, res) => {
+  const { folio } = req.params
+  controller.getProductosByFolio(folio)
+    .then((product) => {
+      responses.success({
+        req,
+        res,
+        data: product
+      })
+    }).catch(err => {
+      responses.error({
+        req,
+        res,
+        details: err,
+        error: "Error al obtener el producto por folio"
+      })
+    })
+})
+
 router.get("/folio-cr", (req, res) => {
   controller
     .getNextFolioCR()
@@ -112,6 +131,22 @@ router.get('/get-ventas-by-zona-cliente/:zona_cliente_id', (req, res) => {
       })
     }).catch(err => {
       console.log(err)
+    })
+})
+
+router.get("/id/:ventaId", (req, res) => {
+  const { ventaId } = req.params;
+
+  controller.getVentaById(Number(ventaId))
+    .then(venta => {
+      responses.success({
+        req, res, data: venta[0]
+      })
+    })
+    .catch(err => {
+      responses.error({
+        res, req, details: err, error: "Error al obtener la venta"
+      })
     })
 })
 

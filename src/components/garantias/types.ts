@@ -34,3 +34,27 @@ export interface CreateImagenGarantiaRequest {
   imgMime: string;
   imgDesc: string;
 }
+
+export type GarantiaEventoRow = {
+  ID: string;
+  GARANTIA_ID: number;
+  TIPO_EVENTO: string;
+  FECHA_EVENTO: string;
+  COMENTARIO: string | null;
+};
+
+export const AllowedEstados = [
+  "NOTIFICADO",
+  "RECOLECTADO",
+  "RECIBIDO",
+  "LEVANTAMIENTO_REPORTE",
+  "EN_PROCESO_REPARACION",
+  "NO_APLICABLE",
+  "APLICABLE",
+  "LISTO_PARA_ENTREGAR",
+  "ENTREGADO",
+  "CIERRE_GARANTIA",
+  "CANCELADO",
+] as const;
+
+export type EstadoGarantia = typeof AllowedEstados[number];

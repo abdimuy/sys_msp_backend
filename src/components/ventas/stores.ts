@@ -23,6 +23,7 @@ import {
   QUERY_GET_ALL_VENTAS_WITH_CLIENTE_WITHOUT_DATE,
   QUERY_SET_PAGO_RECIBIDO,
   QUERY_GET_VENTAS_BY_ZONA_CLIENTE,
+  QUERY_GET_VENTA_BY_ID,
 } from "./queries";
 import { Timestamp } from "../../repositories/firebase";
 // import { createCanvas } from "canvas";
@@ -194,6 +195,20 @@ const getProductosByFolios = async (foliosBatch: string[]): Promise<any[]> => {
   return productosList;
 };
 
+const getProductoByFolio = async (folio: string) => {
+  const folioSql = QUERY_GET_ARTICULOS_BY_FOLIO(folio)
+  const products = await query({
+    sql: folioSql,
+    converters: [
+      {
+        column: "FOLIO",
+        type: "buffer"
+      }
+    ]
+  })
+  return products
+}
+
 const getVentasProductosByFolio = async (folios: string[]): Promise<any[]> => {
   let productos: any[] = [];
 
@@ -229,13 +244,13 @@ const getVentasProductosByFolio = async (folios: string[]): Promise<any[]> => {
 //   });
 // };
 
-const getAllVentasWithCliente = () => {
+const getAllVentasWithCliente = (zona_cliente_id: number) => {
   return new Promise<any[]>(async (resolve, reject) => {
     const ultimoMartes = moment().day("Tuesday").format("YYYY-MM-DD");
     const inicioSemana = moment().day(0).format("YYYY-MM-DD");
     const numCtasRutas = await query({
       sql: QUERY_GET_ALL_VENTAS_WITH_CLIENTE,
-      params: [inicioSemana, ultimoMartes, ultimoMartes],
+      params: [zona_cliente_id, inicioSemana, ultimoMartes, ultimoMartes],
       converters: [
         {
           column: "FOLIO",
@@ -279,6 +294,28 @@ const getAllVentasWithCliente = () => {
   });
 };
 
+const getVentaById = (ventaId: number) => {
+  return new Promise((resolve, reject) => {
+    resolve(
+      query({
+        sql: QUERY_GET_VENTA_BY_ID,
+        params: [ventaId],
+        converters: [
+          { column: "FOLIO", type: "buffer", },
+          { column: "ZONA_NOMBRE", type: "buffer", },
+          { column: "TELEFONO", type: "buffer", },
+          { column: "APLICADO", type: "buffer", },
+          { column: "CALLE", type: "buffer", },
+          { column: "NOTAS", type: "buffer", },
+          { column: "VENDEDOR_1", type: "buffer", },
+          { column: "VENDEDOR_2", type: "buffer", },
+          { column: "VENDEDOR_3", type: "buffer", },
+        ],
+      })
+    )
+  })
+}
+
 const getAllVentasWithClienteWithoutDate = (
   date: Moment = moment().day() === 4 ? moment() : moment().day(-3),
   zonaClienteId: number
@@ -290,7 +327,7 @@ const getAllVentasWithClienteWithoutDate = (
   return new Promise<any[]>(async (resolve, reject) => {
     const numCtasRutas = await query({
       sql: q,
-      // params: [dateInit, zonaClienteId, dateInit, dateInit],
+      // params: [zonaClienteId, zonaClienteId, dateInit],
       params: [dateInit],
       converters: [
         {
@@ -614,4 +651,6 @@ export default {
   insertDataToFirebird,
   getProductosByFolios,
   getVentasByZona: getVentasByZona,
+  getVentaById,
+  getProductoByFolio
 };

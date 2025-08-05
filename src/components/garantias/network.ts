@@ -2,8 +2,8 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { createGarantiaWithImages } from "./controller";
-import { v4 as uuid } from "uuid";
+import controller, { createGarantiaEvento, createGarantiaWithImages, listGarantiaEventos } from "./controller";
+import responses from "../../network/responses";
 
 const router = Router();
 
@@ -19,7 +19,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    const name = `garantia-${req.params.id}-${uuid()}${ext}`;
+    const name = `garantia-${req.params.id}-${file.originalname}`;
     cb(null, name);
   },
 });
@@ -38,11 +38,39 @@ const fileFilter = (
 
 const upload = multer({ storage, fileFilter });
 
+// Ruta: GET /garantias/activa
+router.get("/activa", async (req, res) => {
+  try {
+    const garantias = await controller.getGarantiasActivas();
+    responses.success({ req, res, data: garantias, status: 200 });
+  } catch (error) {
+    responses.error({
+      req,
+      res,
+      error: "Error al obtener garantías activas",
+      details: error,
+      status: 500,
+    });
+  }
+});
+
+router.get("/imagenes/:garantiaId", controller.getImagesByGarantia)
+
+router.get("/:idGarantia", controller.getGarantiaById)
+
+router.get('/eventos_activos', controller.getEventosGarantiasActivas)
+
 // Ruta: POST /garantias/:id/imagenes
 router.post(
   "/:id/imagenes",
-  upload.array("imagenes", 5),
+  upload.array("imagenes", 10),
   createGarantiaWithImages
 );
+
+// POST /garantias/:id/eventos
+router.post('/:id/eventos', createGarantiaEvento);
+
+// GET /garantias/:id/eventos
+router.get('/:id/eventos', listGarantiaEventos);
 
 export default router;

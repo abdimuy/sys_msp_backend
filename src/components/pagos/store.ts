@@ -278,7 +278,7 @@ async function syncChangesToMongo() {
       // console.log('No hay cambios para procesar.');
       return;
     }
-    // console.log(`Detectados ${changes.length} cambios.`);
+    console.log(`Detectados ${changes.length} cambios.`);
 
     const db = await connectToMongo();
 
