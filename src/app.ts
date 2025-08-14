@@ -36,16 +36,17 @@ app.use("/uploads", express.static(uploadsDir));
   try {
     const db = await connectToMongo();
     console.log("La conexión a MongoDB se realizó correctamente.");
+    
+    // Ejecutar sincronización inicial al levantar la API
+    // console.log("Ejecutando sincronización inicial de datos...");
+    // await syncInitialData();
+    
     // Aquí puedes iniciar tu servidor o ejecutar consultas usando "db"
   } catch (error) {
     console.error("No se pudo conectar a MongoDB:", error);
   }
 })();
 
-// syncInitialData().then(() => {
-//   setInterval(store.syncChangesToMongo, 30000);
-//   store.syncChangesToMongo();
-// })
 
 // Configuración mejorada de sincronización
 const SYNC_INTERVAL = 30000; // 30 segundos

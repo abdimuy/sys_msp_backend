@@ -409,7 +409,7 @@ const insertDataToFirebird = async (
   // Inicia la transacción (asegúrate que exista una versión promisificada o la envuelvas en una promesa)
   const transaction = await new Promise<Firebird.Transaction>(
     (resolve, reject) => {
-      db.transaction(Firebird.ISOLATION_READ_COMMITED, (err, trans) => {
+      db.transaction(Firebird.ISOLATION_READ_COMMITTED, (err, trans) => {
         if (err) return reject(err);
         resolve(trans);
       });
