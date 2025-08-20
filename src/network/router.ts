@@ -15,6 +15,7 @@ import visitas from "../components/visitas/network";
 import pagos from "../components/pagos/newtwork";
 import sincronizarAMongo from "../components/sincronizarAMongo/network";
 import garantias from "../components/garantias/network";
+import traspasos from "../components/traspasos/network";
 
 const appRouter = (server: Express) => {
   server.use("/garantias", garantias);
@@ -22,6 +23,7 @@ const appRouter = (server: Express) => {
   server.use("/almacenes", almacenes);
   server.use("/movimientos", movimientos);
   server.use("/movimientos_indiv", movimientoIndividuales);
+  server.use("/traspasos", traspasos);
   server.use("/articulos", articulos);
   server.use("/lineas_articulos", lineasArticulos);
   server.use("/vendedores", vendedores);

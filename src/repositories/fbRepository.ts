@@ -11,7 +11,7 @@ const options: any = {
   user: "SYSDBA",
   password: "masterkey",
   lowercase_keys: false,
-  role: null
+  role: null,
 };
 
 export const pool = Firebird.pool(1000, options);
@@ -80,22 +80,29 @@ export const query = <T>({
 // }
 
 function ab2str(buffer: any): string {
-  if (!buffer) return '';
-  
+  if (!buffer) return "";
+
   // Si ya es string, devolverlo tal cual
-  if (typeof buffer === 'string') return buffer;
-  
+  if (typeof buffer === "string") return buffer;
+
   // Verificar que sea un buffer válido
   if (!Buffer.isBuffer(buffer) && !ArrayBuffer.isView(buffer)) {
-    console.warn('ab2str: Received invalid buffer type:', typeof buffer, buffer);
-    return '';
+    console.warn(
+      "ab2str: Received invalid buffer type:",
+      typeof buffer,
+      buffer
+    );
+    return "";
   }
-  
+
   try {
     // Convertir Buffer a ArrayBuffer si es necesario
     let arrayBuffer: ArrayBuffer | SharedArrayBuffer;
     if (Buffer.isBuffer(buffer)) {
-      arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+      arrayBuffer = buffer.buffer.slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength
+      );
     } else if (ArrayBuffer.isView(buffer)) {
       // Si es un TypedArray o DataView, obtener su ArrayBuffer subyacente
       const bufferData = buffer.buffer;
@@ -103,56 +110,87 @@ function ab2str(buffer: any): string {
         // Crear una copia como ArrayBuffer normal
         const temp = new ArrayBuffer(buffer.byteLength);
         const tempView = new Uint8Array(temp);
-        const sourceView = new Uint8Array(bufferData, buffer.byteOffset, buffer.byteLength);
+        const sourceView = new Uint8Array(
+          bufferData,
+          buffer.byteOffset,
+          buffer.byteLength
+        );
         tempView.set(sourceView);
         arrayBuffer = temp;
       } else {
-        arrayBuffer = bufferData.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+        arrayBuffer = bufferData.slice(
+          buffer.byteOffset,
+          buffer.byteOffset + buffer.byteLength
+        );
       }
     } else {
       arrayBuffer = buffer;
     }
-    
+
     // Verificar que el tamaño sea válido
     if (arrayBuffer.byteLength <= 0 || arrayBuffer.byteLength % 2 !== 0) {
-      console.warn('ab2str: Invalid buffer length:', arrayBuffer.byteLength);
+      console.warn("ab2str: Invalid buffer length:", arrayBuffer.byteLength);
       // Intentar decodificar como UTF-8 en lugar de UTF-16
       if (Buffer.isBuffer(buffer)) {
-        return buffer.toString('utf8');
+        return buffer.toString("utf8");
       }
-      return '';
+      return "";
     }
-    
+
     const uint16Array = new Uint16Array(arrayBuffer);
-    let result = '';
+    let result = "";
     const chunkSize = 8192; // Procesar en bloques para evitar stack overflow
-    
+
     for (let i = 0; i < uint16Array.length; i += chunkSize) {
-      const chunk = uint16Array.slice(i, Math.min(i + chunkSize, uint16Array.length));
+      const chunk = uint16Array.slice(
+        i,
+        Math.min(i + chunkSize, uint16Array.length)
+      );
       result += String.fromCharCode(...chunk);
     }
-    
+
     return result;
   } catch (error) {
-    console.error('ab2str: Error converting buffer:', error);
+    console.error("ab2str: Error converting buffer:", error);
     // Intentar conversión básica si falla
     if (Buffer.isBuffer(buffer)) {
-      return buffer.toString('utf8');
+      return buffer.toString("utf8");
     }
-    return '';
+    return "";
   }
 }
 
-// Función para promisificar una consulta en la transacción
-export const queryAsync = (
+// Función para promisificar una consulta en la transacción con soporte para genéricos y RETURNING
+export const queryAsync = <T = any>(
   transaction: Firebird.Transaction,
   sql: string,
-  params: any[]
-): Promise<any> => {
+  params: any[],
+  returning?: boolean
+): Promise<T[] | T> => {
   return new Promise((resolve, reject) => {
     transaction.query(sql, params, (err, result) => {
       if (err) return reject(err);
-      resolve(result);
+
+      if (returning && result) {
+        // Si es RETURNING y el resultado es un array con un elemento, devolver el elemento directamente
+        if (Array.isArray(result) && result.length === 1) {
+          resolve(result[0] as T);
+        }
+        // Si es un array con múltiples elementos, devolver el array
+        else if (Array.isArray(result)) {
+          resolve(result as T[]);
+        }
+        // Si no es array, devolver tal como viene
+        else {
+          resolve(result as T);
+        }
+      } else if (returning) {
+        // Si esperaba RETURNING pero no hay resultado, devolver null
+        resolve(null as any);
+      } else {
+        // Para queries normales (INSERT/UPDATE sin RETURNING), devolver array vacío o resultado
+        resolve(result || []);
+      }
     });
   });
 };
