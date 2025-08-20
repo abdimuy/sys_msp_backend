@@ -21,11 +21,14 @@ import {
   QUERY_GET_TRASPASO_DETALLE,
   QUERY_GET_COSTO_ARTICULO,
   QUERY_VALIDAR_EXISTENCIAS,
+  QUERY_GET_CLAVE_ARTICULO,
 } from "./querys";
 import {
   ITraspaso,
   IDetalleTraspasoInput,
   TRASPASO_CONFIG,
+  TipoErrorTraspaso,
+  ErrorTraspaso,
 } from "./interfaces";
 
 const converterTraspasos: IQueryConverter[] = [
@@ -176,35 +179,89 @@ interface IExistenciaResult {
   EXISTENCIA_DISPONIBLE: number;
 }
 
-// Validar existencias de artículos - COMENTADO: La BD maneja las validaciones
-// const validarExistencias = async (
-//   almacenId: number,
-//   articulos: IDetalleTraspasoInput[]
-// ): Promise<{ valido: boolean; errores: string[] }> => {
-//   const errores: string[] = [];
+interface IClaveArticuloResult {
+  CLAVE: string;
+  NOMBRE: string;
+  ARTICULO_ID: number;
+}
 
-//   for (const articulo of articulos) {
-//     const result = await query<IExistenciaResult>({
-//       sql: QUERY_VALIDAR_EXISTENCIAS,
-//       params: [almacenId, articulo.articuloId],
-//     });
+// Obtener clave de un artículo usando ROL_CLAVE_ART_ID = 17
+const obtenerClaveArticulo = async (articuloId: number): Promise<string> => {
+  try {
+    const result = await query<IClaveArticuloResult>({
+      sql: QUERY_GET_CLAVE_ARTICULO,
+      params: [articuloId]
+    });
+    
+    if (result.length === 0) {
+      throw new ErrorTraspaso(
+        TipoErrorTraspaso.ERROR_PARAMETROS,
+        `No se encontró clave para el artículo ID ${articuloId}`,
+        [`Artículo ID ${articuloId} no tiene clave configurada con ROL_CLAVE_ART_ID = 17`],
+        'ARTICULO_SIN_CLAVE'
+      );
+    }
+    
+    return result[0].CLAVE;
+  } catch (error) {
+    if (error instanceof ErrorTraspaso) {
+      throw error;
+    }
+    throw new ErrorTraspaso(
+      TipoErrorTraspaso.ERROR_TECNICO,
+      'Error al obtener clave del artículo',
+      [error instanceof Error ? error.message : String(error)],
+      'ERROR_BD_CLAVE'
+    );
+  }
+};
 
-//     if (result.length === 0) {
-//       errores.push(`Artículo ${articulo.articuloId} no encontrado`);
-//     } else if (result[0].EXISTENCIA_DISPONIBLE < articulo.unidades) {
-//       errores.push(
-//         `Artículo ${result[0].CLAVE} - ${result[0].NOMBRE}: ` +
-//           `existencia disponible (${result[0].EXISTENCIA_DISPONIBLE}) ` +
-//           `menor a la solicitada (${articulo.unidades})`
-//       );
-//     }
-//   }
+// Validar existencias de artículos usando SALDOS_IN (misma lógica que almacenes)
+const validarExistencias = async (
+  almacenId: number,
+  articulos: IDetalleTraspasoInput[]
+): Promise<void> => {
+  const erroresStock: string[] = [];
 
-//   return {
-//     valido: errores.length === 0,
-//     errores,
-//   };
-// };
+  try {
+    for (const articulo of articulos) {
+      const result = await query<IExistenciaResult>({
+        sql: QUERY_VALIDAR_EXISTENCIAS,
+        params: [almacenId, articulo.articuloId],
+      });
+
+      if (result.length === 0) {
+        erroresStock.push(`Artículo ID ${articulo.articuloId} no encontrado`);
+      } else if (result[0].EXISTENCIA_DISPONIBLE < articulo.unidades) {
+        erroresStock.push(
+          `Artículo ${result[0].CLAVE} - ${result[0].NOMBRE}: ` +
+            `existencia disponible (${result[0].EXISTENCIA_DISPONIBLE}) ` +
+            `menor a la solicitada (${articulo.unidades})`
+        );
+      }
+    }
+
+    // Si hay errores de stock, lanzar error específico
+    if (erroresStock.length > 0) {
+      throw new ErrorTraspaso(
+        TipoErrorTraspaso.VALIDACION_STOCK,
+        'Stock insuficiente para realizar el traspaso',
+        erroresStock,
+        'STOCK_INSUFICIENTE'
+      );
+    }
+  } catch (error) {
+    if (error instanceof ErrorTraspaso) {
+      throw error;
+    }
+    throw new ErrorTraspaso(
+      TipoErrorTraspaso.ERROR_TECNICO,
+      'Error al validar existencias',
+      [error instanceof Error ? error.message : String(error)],
+      'ERROR_BD_EXISTENCIAS'
+    );
+  }
+};
 
 // Crear traspaso completo
 const crearTraspaso = async (datosTraspaso: ITraspaso): Promise<any> => {
@@ -212,17 +269,11 @@ const crearTraspaso = async (datosTraspaso: ITraspaso): Promise<any> => {
   const transaction = await getDbTransactionAsync(db);
 
   try {
-    // Validar existencias antes de proceder - COMENTADO: La BD maneja las validaciones
-    // const validacion = await validarExistencias(
-    //   datosTraspaso.almacenOrigenId,
-    //   datosTraspaso.detalles
-    // );
-
-    // if (!validacion.valido) {
-    //   throw new Error(
-    //     `Validación de existencias falló: ${validacion.errores.join(", ")}`
-    //   );
-    // }
+    // Validar existencias antes de proceder usando SALDOS_IN
+    await validarExistencias(
+      datosTraspaso.almacenOrigenId,
+      datosTraspaso.detalles
+    );
 
     const folio = await generateNextFolio(
       datosTraspaso.almacenOrigenId,
@@ -286,6 +337,9 @@ const crearTraspaso = async (datosTraspaso: ITraspaso): Promise<any> => {
       // Los costos se calculan automáticamente, se envían en 0
       const costoUnitario = 0;
       const costoTotal = 0;
+      
+      // Obtener automáticamente la clave del artículo si no se proporciona
+      const claveArticulo = detalle.claveArticulo || await obtenerClaveArticulo(detalle.articuloId);
 
       // Insertar salida del almacén origen con ID = -1 y obtener el ID generado
       const salidaResult = await queryAsync<IDoctoInDetResult>(
@@ -296,7 +350,7 @@ const crearTraspaso = async (datosTraspaso: ITraspaso): Promise<any> => {
           doctoInId,
           datosTraspaso.almacenOrigenId,
           TRASPASO_CONFIG.CONCEPTO_SALIDA_ID,
-          detalle.claveArticulo,
+          claveArticulo,
           detalle.articuloId,
           "S", // TIPO_MOVTO
           detalle.unidades,
@@ -326,7 +380,7 @@ const crearTraspaso = async (datosTraspaso: ITraspaso): Promise<any> => {
           doctoInId,
           datosTraspaso.almacenDestinoId,
           TRASPASO_CONFIG.CONCEPTO_ENTRADA_ID,
-          detalle.claveArticulo,
+          claveArticulo,
           detalle.articuloId,
           "E", // TIPO_MOVTO
           detalle.unidades,
@@ -438,6 +492,7 @@ export default {
   crear: crearTraspaso,
   listar: obtenerTraspasos,
   obtenerDetalle: obtenerDetalleTraspaso,
-  // validarExistencias, // COMENTADO
+  validarExistencias,
   getCostoArticulo,
+  obtenerClaveArticulo,
 };

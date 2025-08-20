@@ -9,7 +9,7 @@ export interface ITraspaso {
 
 export interface IDetalleTraspasoInput {
   articuloId: number;
-  claveArticulo: string;
+  claveArticulo?: string; // Opcional - se obtiene automáticamente si no se proporciona
   unidades: number;
 }
 
@@ -60,6 +60,44 @@ export interface IDoctoInDet {
   ROL: "S" | "E";
   FECHA: Date | string;
   CENTRO_COSTO_ID?: number;
+}
+
+// Tipos de errores para traspasos
+export enum TipoErrorTraspaso {
+  VALIDACION_STOCK = 'VALIDACION_STOCK',
+  ERROR_TECNICO = 'ERROR_TECNICO',
+  ERROR_PARAMETROS = 'ERROR_PARAMETROS'
+}
+
+export interface IErrorTraspaso {
+  tipo: TipoErrorTraspaso;
+  mensaje: string;
+  detalles?: string[];
+  codigo?: string;
+}
+
+// Clase de error personalizada para traspasos
+export class ErrorTraspaso extends Error {
+  public tipo: TipoErrorTraspaso;
+  public detalles?: string[];
+  public codigo?: string;
+
+  constructor(tipo: TipoErrorTraspaso, mensaje: string, detalles?: string[], codigo?: string) {
+    super(mensaje);
+    this.name = 'ErrorTraspaso';
+    this.tipo = tipo;
+    this.detalles = detalles;
+    this.codigo = codigo;
+  }
+
+  toJSON() {
+    return {
+      tipo: this.tipo,
+      mensaje: this.message,
+      detalles: this.detalles,
+      codigo: this.codigo
+    };
+  }
 }
 
 // Configuración por defecto para traspasos

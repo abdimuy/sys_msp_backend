@@ -20,8 +20,8 @@ const crearTraspaso = (datosTraspaso: ITraspaso): Promise<any> => {
       
       // Validar que todos los detalles tengan la información necesaria
       for (const detalle of datosTraspaso.detalles) {
-        if (!detalle.articuloId || !detalle.claveArticulo) {
-          throw new Error('Todos los artículos deben tener ID y clave');
+        if (!detalle.articuloId) {
+          throw new Error('Todos los artículos deben tener ID');
         }
         
         if (detalle.unidades <= 0) {

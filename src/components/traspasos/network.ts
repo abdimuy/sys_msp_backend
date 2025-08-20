@@ -1,7 +1,7 @@
 import express from 'express';
 import controller from './controller';
 import responses from '../../network/responses';
-import { ITraspaso } from './interfaces';
+import { ITraspaso, ErrorTraspaso, TipoErrorTraspaso } from './interfaces';
 
 const router = express.Router();
 
@@ -22,6 +22,25 @@ router.post('/', async (req, res) => {
       }
     });
   } catch (error: any) {
+    // Manejar errores específicos de traspaso
+    if (error instanceof ErrorTraspaso) {
+      const statusCode = error.tipo === TipoErrorTraspaso.VALIDACION_STOCK ? 400 : 
+                        error.tipo === TipoErrorTraspaso.ERROR_PARAMETROS ? 400 : 500;
+      
+      return responses.error({
+        req,
+        res,
+        status: statusCode,
+        error: error.message,
+        details: JSON.stringify({
+          tipo: error.tipo,
+          codigo: error.codigo,
+          detalles: error.detalles
+        })
+      });
+    }
+    
+    // Error genérico
     return responses.error({
       req,
       res,
