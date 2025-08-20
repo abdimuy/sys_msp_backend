@@ -25,17 +25,4 @@ router.get('/byAlmacen/:almacenId', (req, res) => {
     });
 })
 
-router.post('/', (req, res) => {
-  const {
-    traspaso,
-  } = req.body;
-  controller.setMovimientos(traspaso)
-    .then(data => {
-      responses.success({ req, res, data });
-    })
-    .catch(err => {
-      responses.error({ req, res, error: 'Error al guardar el traspaso', details: err });
-    })
-})
-
 export default router;

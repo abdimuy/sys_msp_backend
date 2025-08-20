@@ -5,8 +5,6 @@ import {
 } from "./querys";
 import { IQueryConverter } from "../../repositories/fbRepository";
 import { ApiMicrosip } from "../../repositories/apiMicrosip";
-import { IMovimiento, ITraspaso } from "./controller";
-import axios, { Axios } from "axios";
 
 const converter: IQueryConverter[] = [
   {
@@ -56,39 +54,7 @@ const getMovimientosOneAlmacen = (almacenId: number) => {
     }
   });
 };
-
-const setMovimiento = (traspaso: ITraspaso) => {
-  const {
-    almacenEndId,
-    almacenInitId,
-    conceptoId,
-    descripcion,
-    fecha,
-    movimientos,
-  } = traspaso;
-  return new Promise<Axios>(async (resolve, reject) => {
-    try {
-      const traspasoApi = {
-        concepto_id: conceptoId,
-        almacen_init_id: almacenInitId,
-        almacen_finish_id: almacenEndId,
-        fecha: fecha,
-        descripcion: descripcion,
-        lista: movimientos.map((movimiento) => ({
-          articulo_id: movimiento.articuloId,
-          unidades: movimiento.cantidad,
-        })),
-      };
-      const response = await ApiMicrosip.post("inventory", traspasoApi);
-      resolve(response.data);
-    } catch (err) {
-      reject(err);
-    }
-  });
-};
-
 export default {
   list: getMovimientos,
   oneByAlmacen: getMovimientosOneAlmacen,
-  set: setMovimiento,
 };

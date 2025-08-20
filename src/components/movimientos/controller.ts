@@ -40,28 +40,7 @@ const getMovimientosByAlmacen = (almacenId: number) => {
   });
 }
 
-export interface ITraspaso {
-  conceptoId: number;
-  almacenInitId: number;
-  almacenEndId: number;
-  fecha: string;
-  descripcion: string;
-  movimientos: IMovimiento[];
-}
-
-export interface IMovimiento {
-  articuloId: number;
-  cantidad: number;
-}
-
-const setMovimientos = (traspaso: ITraspaso) => {
-  return new Promise(async (resolve, reject) => {
-    resolve(store.set(traspaso));
-  })
-}
-
 export default {
   getMovimientos,
-  getMovimientosByAlmacen,
-  setMovimientos
+  getMovimientosByAlmacen
 }
