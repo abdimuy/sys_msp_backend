@@ -24,7 +24,7 @@ router.post('/', async (req, res) => {
   } catch (error: any) {
     // Manejar errores específicos de traspaso
     if (error instanceof ErrorTraspaso) {
-      const statusCode = error.tipo === TipoErrorTraspaso.VALIDACION_STOCK ? 400 : 
+      const statusCode = error.tipo === TipoErrorTraspaso.VALIDACION_STOCK ? 422 : 
                         error.tipo === TipoErrorTraspaso.ERROR_PARAMETROS ? 400 : 500;
       
       return responses.error({

@@ -22,6 +22,8 @@ import {
   QUERY_GET_COSTO_ARTICULO,
   QUERY_VALIDAR_EXISTENCIAS,
   QUERY_GET_CLAVE_ARTICULO,
+  QUERY_GET_NEXT_FOLIO_NUMBER,
+  QUERY_CHECK_FOLIO_EXISTS,
 } from "./querys";
 import {
   ITraspaso,
@@ -63,6 +65,14 @@ interface ILastPrefixResult {
   PREFIJO: string;
 }
 
+interface INextNumberResult {
+  NEXT_NUMBER: number;
+}
+
+interface IFolioExistsResult {
+  EXISTE: number;
+}
+
 // Configuración del sistema de folios
 const FOLIO_CONFIG = {
   PREFIJO_INICIAL: "TRA",
@@ -97,62 +107,61 @@ const incrementarPrefijo = (prefijo: string): string => {
 };
 
 /**
- * Genera el siguiente folio disponible con formato profesional
- * @param almacenId - ID del almacén
+ * Genera un folio único usando múltiples fuentes de entropía
+ * Formato: TRA + 6 dígitos (respeta límite de 9 caracteres de BD)
  * @param conceptoId - ID del concepto
- * @returns Folio generado (ej: TRA000001)
+ * @returns Folio generado (ej: TRA123456)
  */
 const generateNextFolio = async (
-  almacenId: number,
   conceptoId: number
 ): Promise<string> => {
-  try {
-    // Primero, obtener el último prefijo usado
-    let prefijoActual = FOLIO_CONFIG.PREFIJO_INICIAL;
-
-    const ultimoPrefijoResult = await query<ILastPrefixResult>({
-      sql: QUERY_GET_LAST_PREFIX,
-      params: [almacenId, conceptoId],
-    });
-
-    if (ultimoPrefijoResult.length > 0) {
-      prefijoActual = ultimoPrefijoResult[0].PREFIJO;
-    }
-
-    // Obtener el último folio con este prefijo
-    const ultimoFolioResult = await query<ILastFolioResult>({
-      sql: QUERY_GET_LAST_FOLIO_BY_PREFIX,
-      params: [prefijoActual, almacenId, conceptoId],
-    });
-
-    let siguienteNumero = FOLIO_CONFIG.NUMERO_INICIAL;
-
-    if (ultimoFolioResult.length > 0) {
-      const numeroActual = ultimoFolioResult[0].NUMERO_ACTUAL;
-
-      // Verificar si hemos alcanzado el límite
-      if (numeroActual >= FOLIO_CONFIG.LIMITE_NUMERICO) {
-        // Incrementar el prefijo y reiniciar el número
-        prefijoActual = incrementarPrefijo(prefijoActual);
-        siguienteNumero = FOLIO_CONFIG.NUMERO_INICIAL;
-      } else {
-        siguienteNumero = numeroActual + 1;
+  const maxRetries = 50;
+  
+  for (let retry = 0; retry < maxRetries; retry++) {
+    try {
+      const now = Date.now();
+      
+      // 1. Componente temporal (3 dígitos - segundos desde epoch mod 1000)
+      const timestampPart = (Math.floor(now / 1000) % 1000).toString().padStart(3, '0');
+      
+      // 2. Componente aleatorio criptográfico (3 dígitos)
+      const crypto = require('crypto');
+      const randomBytes = crypto.randomBytes(2);
+      const randomPart = (randomBytes.readUInt16BE(0) % 1000).toString().padStart(3, '0');
+      
+      // 3. Ensamblar folio (TRA + 6 dígitos = 9 caracteres total)
+      const folio = `${FOLIO_CONFIG.PREFIJO_INICIAL}${timestampPart}${randomPart}`;
+      
+      // 4. Verificar unicidad en BD
+      const existeResult = await query<IFolioExistsResult>({
+        sql: QUERY_CHECK_FOLIO_EXISTS,
+        params: [folio, conceptoId],
+      });
+      
+      if (existeResult[0].EXISTE === 0) {
+        return folio;
       }
+      
+      // Si existe, agregar delay progresivo para evitar colisiones
+      console.warn(`Folio ${folio} ya existe, reintentando... (${retry + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, Math.min(retry * 2, 50)));
+      
+    } catch (error) {
+      console.error(`Error en intento ${retry + 1} de generación de folio:`, error);
+      
+      if (retry === maxRetries - 1) {
+        // Último recurso: timestamp de 6 dígitos
+        const timestamp = Date.now();
+        const fallbackNumber = timestamp.toString().slice(-6);
+        return `${FOLIO_CONFIG.PREFIJO_INICIAL}${fallbackNumber}`;
+      }
+      
+      // Delay antes del siguiente intento
+      await new Promise(resolve => setTimeout(resolve, 5 + retry));
     }
-
-    // Formatear el folio final
-    const numeroFormateado = String(siguienteNumero).padStart(
-      FOLIO_CONFIG.LONGITUD_NUMERO,
-      "0"
-    );
-
-    return `${prefijoActual}${numeroFormateado}`;
-  } catch (error) {
-    console.error("Error generando folio:", error);
-    // En caso de error, usar folio de respaldo
-    const timestamp = Date.now().toString().slice(-6);
-    return `${FOLIO_CONFIG.PREFIJO_INICIAL}${timestamp}`;
   }
+  
+  throw new Error("No se pudo generar folio único después de múltiples intentos");
 };
 
 interface ICostoResult {
@@ -276,7 +285,6 @@ const crearTraspaso = async (datosTraspaso: ITraspaso): Promise<any> => {
     );
 
     const folio = await generateNextFolio(
-      datosTraspaso.almacenOrigenId,
       TRASPASO_CONFIG.CONCEPTO_SALIDA_ID
     );
 

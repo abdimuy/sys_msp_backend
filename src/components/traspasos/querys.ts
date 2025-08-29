@@ -14,27 +14,25 @@ export const QUERY_GET_NEXT_SUB_MOVTO_ID = `
   FROM RDB$DATABASE
 `;
 
-// Query para obtener el último folio con un prefijo específico
+// Query para obtener el último folio con un prefijo específico (global, sin importar almacén)
 export const QUERY_GET_LAST_FOLIO_BY_PREFIX = `
   SELECT 
     FOLIO,
     CAST(SUBSTRING(FOLIO FROM 4) AS INTEGER) AS NUMERO_ACTUAL
   FROM DOCTOS_IN
   WHERE SUBSTRING(FOLIO FROM 1 FOR 3) = ?
-    AND ALMACEN_ID = ?
     AND CONCEPTO_IN_ID = ?
     AND CHAR_LENGTH(FOLIO) = 9
   ORDER BY CAST(SUBSTRING(FOLIO FROM 4) AS INTEGER) DESC
   ROWS 1
 `;
 
-// Query para obtener el último prefijo usado en traspasos
+// Query para obtener el último prefijo usado en traspasos (global, sin importar almacén)
 export const QUERY_GET_LAST_PREFIX = `
   SELECT DISTINCT
     SUBSTRING(FOLIO FROM 1 FOR 3) AS PREFIJO
   FROM DOCTOS_IN
   WHERE FOLIO SIMILAR TO '[A-Z][A-Z][A-Z][0-9][0-9][0-9][0-9][0-9][0-9]'
-    AND ALMACEN_ID = ?
     AND CONCEPTO_IN_ID = ?
   ORDER BY SUBSTRING(FOLIO FROM 1 FOR 3) DESC
   ROWS 1
@@ -163,4 +161,18 @@ export const QUERY_GET_CLAVE_ARTICULO = `
   LEFT JOIN ARTICULOS ART ON CART.ARTICULO_ID = ART.ARTICULO_ID
   WHERE CART.ROL_CLAVE_ART_ID = 17 
     AND CART.ARTICULO_ID = ?
+`;
+
+// Query para generar siguiente número usando generador de Firebird
+export const QUERY_GET_NEXT_FOLIO_NUMBER = `
+  SELECT GEN_ID(GEN_TRASPASOS_FOLIO, 1) AS NEXT_NUMBER 
+  FROM RDB$DATABASE
+`;
+
+// Query para verificar si un folio específico ya existe
+export const QUERY_CHECK_FOLIO_EXISTS = `
+  SELECT COUNT(*) AS EXISTE
+  FROM DOCTOS_IN
+  WHERE FOLIO = ?
+    AND CONCEPTO_IN_ID = ?
 `;
