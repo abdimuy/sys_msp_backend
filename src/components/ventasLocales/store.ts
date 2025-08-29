@@ -69,7 +69,7 @@ interface IResumenResult {
 // Función para normalizar textos: mayúsculas, sin acentos, sin espacios extra
 const normalizarTexto = (texto: string | null | undefined): string => {
   if (!texto) return "";
-  
+
   return texto
     .trim() // Eliminar espacios al inicio y final
     .toUpperCase() // Convertir a mayúsculas
@@ -104,7 +104,10 @@ const verificarArticuloExiste = async (
   }
 };
 
-const crearVentaLocal = async (datosVenta: IVentaLocalInput, almacenId: number): Promise<any> => {
+const crearVentaLocal = async (
+  datosVenta: IVentaLocalInput,
+  almacenId: number
+): Promise<any> => {
   const db = await getDbConnectionAsync();
   const transaction = await getDbTransactionAsync(db);
 
@@ -148,7 +151,7 @@ const crearVentaLocal = async (datosVenta: IVentaLocalInput, almacenId: number):
 
     await queryAsync(
       transaction,
-      QUERY_INSERT_VENTA_LOCAL.replace(' RETURNING LOCAL_SALE_ID', ''),
+      QUERY_INSERT_VENTA_LOCAL.replace(" RETURNING LOCAL_SALE_ID", ""),
       [
         datosVenta.localSaleId.trim().toUpperCase(),
         datosVenta.userEmail.trim().toLowerCase(),
@@ -167,7 +170,7 @@ const crearVentaLocal = async (datosVenta: IVentaLocalInput, almacenId: number):
         normalizarTexto(datosVenta.diaCobranza),
         datosVenta.precioTotal,
         datosVenta.tiempoACortoPlazoMeses,
-        datosVenta.montoACortoPlazo
+        datosVenta.montoACortoPlazo,
       ]
     );
 
@@ -185,17 +188,19 @@ const crearVentaLocal = async (datosVenta: IVentaLocalInput, almacenId: number):
 
     // Guardar imágenes si existen
     if (datosVenta.imagenes && datosVenta.imagenes.length > 0) {
-      const { v4: uuidv4 } = await import('uuid');
-      
+      const { v4: uuidv4 } = await import("uuid");
+
       for (const imagen of datosVenta.imagenes) {
         if (imagen.archivo) {
           const imagenId = uuidv4();
+          const rutaRelativa = `/uploads/ventas-locales/${imagen.archivo.filename}`;
+
           await queryAsync(transaction, QUERY_INSERT_IMAGEN_VENTA_LOCAL, [
             imagenId,
             datosVenta.localSaleId.trim().toUpperCase(),
-            imagen.archivo.path,
+            rutaRelativa,
             imagen.archivo.mimetype,
-            normalizarTexto(imagen.descripcion || 'Imagen de venta'),
+            normalizarTexto(imagen.descripcion || "Imagen de venta"),
           ]);
         }
       }
@@ -210,16 +215,19 @@ const crearVentaLocal = async (datosVenta: IVentaLocalInput, almacenId: number):
         almacenOrigenId: almacenId,
         almacenDestinoId: VENTA_LOCAL_CONFIG.ALMACEN_DESTINO_VENTAS,
         descripcion: `Traspaso automático por venta local ${datosVenta.localSaleId}`,
-        detalles: datosVenta.productos.map(producto => ({
+        detalles: datosVenta.productos.map((producto) => ({
           articuloId: producto.articuloId,
-          unidades: producto.cantidad
+          unidades: producto.cantidad,
         })),
-        usuario: datosVenta.userEmail
+        usuario: datosVenta.userEmail,
       };
 
       await traspasosController.crear(datosTraspaso);
     } catch (traspasoError) {
-      console.warn(`Advertencia: No se pudo crear el traspaso para la venta ${datosVenta.localSaleId}:`, traspasoError);
+      console.warn(
+        `Advertencia: No se pudo crear el traspaso para la venta ${datosVenta.localSaleId}:`,
+        traspasoError
+      );
     }
 
     return {
@@ -445,7 +453,9 @@ const eliminarVentaLocal = async (localSaleId: string): Promise<any> => {
       localSaleId.trim().toUpperCase(),
     ]);
 
-    await queryAsync(transaction, QUERY_DELETE_VENTA_LOCAL, [localSaleId.trim().toUpperCase()]);
+    await queryAsync(transaction, QUERY_DELETE_VENTA_LOCAL, [
+      localSaleId.trim().toUpperCase(),
+    ]);
 
     await commitTransactionAsync(transaction);
     await detachDbAsync(db);
