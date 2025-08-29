@@ -29,6 +29,8 @@ export interface IProductoVentaLocal {
 
 export interface IVentaLocalDB {
   LOCAL_SALE_ID: string;
+  USER_EMAIL: string;
+  ALMACEN_ID: number;
   NOMBRE_CLIENTE: string;
   FECHA_VENTA: Date | string;
   LATITUD: number;
@@ -59,6 +61,7 @@ export interface IProductoVentaLocalDB {
 
 export interface IVentaLocalInput {
   localSaleId: string;
+  userEmail: string;
   nombreCliente: string;
   fechaVenta?: Date | string;
   latitud: number;

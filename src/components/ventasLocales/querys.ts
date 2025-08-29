@@ -1,6 +1,8 @@
 export const QUERY_INSERT_VENTA_LOCAL = `
   INSERT INTO MSP_LOCAL_SALE (
     LOCAL_SALE_ID,
+    USER_EMAIL,
+    ALMACEN_ID,
     NOMBRE_CLIENTE,
     FECHA_VENTA,
     LATITUD,
@@ -17,7 +19,7 @@ export const QUERY_INSERT_VENTA_LOCAL = `
     TIEMPO_A_CORTO_PLAZOMESES,
     MONTO_A_CORTO_PLAZO,
     ENVIADO
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true)
   RETURNING LOCAL_SALE_ID
 `;
 
@@ -42,6 +44,8 @@ export const QUERY_CHECK_VENTA_EXISTS = `
 export const QUERY_GET_VENTAS_LOCALES = `
   SELECT 
     V.LOCAL_SALE_ID,
+    V.USER_EMAIL,
+    V.ALMACEN_ID,
     V.NOMBRE_CLIENTE,
     V.FECHA_VENTA,
     V.LATITUD,
@@ -65,6 +69,8 @@ export const QUERY_GET_VENTAS_LOCALES = `
 export const QUERY_GET_VENTA_LOCAL_BY_ID = `
   SELECT 
     V.LOCAL_SALE_ID,
+    V.USER_EMAIL,
+    V.ALMACEN_ID,
     V.NOMBRE_CLIENTE,
     V.FECHA_VENTA,
     V.LATITUD,
@@ -102,6 +108,8 @@ export const QUERY_GET_PRODUCTOS_VENTA_LOCAL = `
 export const QUERY_UPDATE_VENTA_LOCAL = `
   UPDATE MSP_LOCAL_SALE
   SET 
+    USER_EMAIL = ?,
+    ALMACEN_ID = ?,
     NOMBRE_CLIENTE = ?,
     FECHA_VENTA = ?,
     LATITUD = ?,

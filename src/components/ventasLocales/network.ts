@@ -253,4 +253,43 @@ router.delete('/:localSaleId', async (req, res) => {
   }
 });
 
+// Endpoint temporal para consultar estructura de usuario Firebase
+router.get('/temp/usuario-firebase/:email', async (req, res) => {
+  try {
+    const { db } = await import('../../repositories/firebase');
+    const { email } = req.params;
+    
+    const usersCollection = db.collection('users');
+    const querySnapshot = await usersCollection.where('EMAIL', '==', email).get();
+    
+    if (querySnapshot.empty) {
+      return responses.error({
+        req,
+        res,
+        status: 404,
+        error: 'Usuario no encontrado',
+        details: `No se encontró usuario con email ${email}`
+      });
+    }
+    
+    const userData = querySnapshot.docs[0].data();
+    
+    return responses.success({
+      req,
+      res,
+      data: {
+        docId: querySnapshot.docs[0].id,
+        userData: userData
+      }
+    });
+  } catch (error: any) {
+    return responses.error({
+      req,
+      res,
+      error: 'Error al consultar Firebase',
+      details: error.message || error
+    });
+  }
+});
+
 export default router;

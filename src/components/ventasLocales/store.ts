@@ -36,6 +36,7 @@ import {
 
 const converterVentaLocal: IQueryConverter[] = [
   { type: "buffer", column: "LOCAL_SALE_ID" },
+  { type: "buffer", column: "USER_EMAIL" },
   { type: "buffer", column: "NOMBRE_CLIENTE" },
   { type: "buffer", column: "DIRECCION" },
   { type: "buffer", column: "TELEFONO" },
@@ -99,7 +100,7 @@ const verificarArticuloExiste = async (
   }
 };
 
-const crearVentaLocal = async (datosVenta: IVentaLocalInput): Promise<any> => {
+const crearVentaLocal = async (datosVenta: IVentaLocalInput, almacenId: number): Promise<any> => {
   const db = await getDbConnectionAsync();
   const transaction = await getDbTransactionAsync(db);
 
@@ -146,6 +147,8 @@ const crearVentaLocal = async (datosVenta: IVentaLocalInput): Promise<any> => {
       QUERY_INSERT_VENTA_LOCAL.replace(' RETURNING LOCAL_SALE_ID', ''),
       [
         datosVenta.localSaleId.trim().toUpperCase(),
+        datosVenta.userEmail.trim().toLowerCase(),
+        almacenId,
         normalizarTexto(datosVenta.nombreCliente),
         fechaFormateada,
         datosVenta.latitud,
@@ -194,7 +197,8 @@ const crearVentaLocal = async (datosVenta: IVentaLocalInput): Promise<any> => {
 
 const actualizarVentaLocal = async (
   localSaleId: string,
-  datosVenta: IVentaLocalInput
+  datosVenta: IVentaLocalInput,
+  almacenId: number
 ): Promise<any> => {
   const db = await getDbConnectionAsync();
   const transaction = await getDbTransactionAsync(db);
@@ -238,6 +242,8 @@ const actualizarVentaLocal = async (
     const fechaFormateada = fechaVenta.format("YYYY-MM-DD HH:mm:ss.SSS");
 
     await queryAsync(transaction, QUERY_UPDATE_VENTA_LOCAL, [
+      datosVenta.userEmail.trim().toLowerCase(),
+      almacenId,
       normalizarTexto(datosVenta.nombreCliente),
       fechaFormateada,
       datosVenta.latitud,

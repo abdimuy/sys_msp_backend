@@ -5,6 +5,8 @@ import {
   ErrorVentaLocal,
   TipoErrorVentaLocal 
 } from './interfaces';
+import { obtenerAlmacenDelUsuario } from '../../services/firebaseUserService';
+import { validarStockParaVenta } from '../../services/inventarioService';
 
 const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
   return new Promise(async (resolve, reject) => {
@@ -15,6 +17,15 @@ const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
           'El ID de la venta local es requerido',
           ['localSaleId es un campo obligatorio'],
           'ID_VENTA_REQUERIDO'
+        );
+      }
+
+      if (!datosVenta.userEmail || datosVenta.userEmail.trim() === '') {
+        throw new ErrorVentaLocal(
+          TipoErrorVentaLocal.ERROR_PARAMETROS,
+          'El email del usuario es requerido',
+          ['userEmail es un campo obligatorio'],
+          'USER_EMAIL_REQUERIDO'
         );
       }
 
@@ -83,7 +94,31 @@ const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
         );
       }
 
-      const resultado = await store.crear(datosVenta);
+      // Obtener el almacén del usuario desde Firebase
+      let almacenId: number;
+      try {
+        almacenId = await obtenerAlmacenDelUsuario(datosVenta.userEmail);
+      } catch (error) {
+        throw new ErrorVentaLocal(
+          TipoErrorVentaLocal.ERROR_PARAMETROS,
+          'Error al obtener información del usuario',
+          [error instanceof Error ? error.message : String(error)],
+          'ERROR_USUARIO_FIREBASE'
+        );
+      }
+
+      // Validar stock disponible en el almacén del usuario
+      const validacionStock = await validarStockParaVenta(almacenId, datosVenta.productos);
+      if (!validacionStock.valido) {
+        throw new ErrorVentaLocal(
+          TipoErrorVentaLocal.ERROR_ARTICULO_NO_EXISTE,
+          'Stock insuficiente para realizar la venta',
+          validacionStock.errores,
+          'STOCK_INSUFICIENTE'
+        );
+      }
+
+      const resultado = await store.crear(datosVenta, almacenId);
       resolve(resultado);
       
     } catch (error) {
@@ -107,6 +142,15 @@ const actualizarVentaLocal = (
         );
       }
 
+      if (!datosVenta.userEmail || datosVenta.userEmail.trim() === '') {
+        throw new ErrorVentaLocal(
+          TipoErrorVentaLocal.ERROR_PARAMETROS,
+          'El email del usuario es requerido',
+          ['userEmail es un campo obligatorio'],
+          'USER_EMAIL_REQUERIDO'
+        );
+      }
+
       if (!datosVenta.nombreCliente || datosVenta.nombreCliente.trim() === '') {
         throw new ErrorVentaLocal(
           TipoErrorVentaLocal.ERROR_PARAMETROS,
@@ -125,7 +169,31 @@ const actualizarVentaLocal = (
         );
       }
 
-      const resultado = await store.actualizar(localSaleId, datosVenta);
+      // Obtener el almacén del usuario desde Firebase
+      let almacenId: number;
+      try {
+        almacenId = await obtenerAlmacenDelUsuario(datosVenta.userEmail);
+      } catch (error) {
+        throw new ErrorVentaLocal(
+          TipoErrorVentaLocal.ERROR_PARAMETROS,
+          'Error al obtener información del usuario',
+          [error instanceof Error ? error.message : String(error)],
+          'ERROR_USUARIO_FIREBASE'
+        );
+      }
+
+      // Validar stock disponible en el almacén del usuario
+      const validacionStock = await validarStockParaVenta(almacenId, datosVenta.productos);
+      if (!validacionStock.valido) {
+        throw new ErrorVentaLocal(
+          TipoErrorVentaLocal.ERROR_ARTICULO_NO_EXISTE,
+          'Stock insuficiente para actualizar la venta',
+          validacionStock.errores,
+          'STOCK_INSUFICIENTE'
+        );
+      }
+
+      const resultado = await store.actualizar(localSaleId, datosVenta, almacenId);
       resolve(resultado);
       
     } catch (error) {
@@ -222,7 +290,26 @@ const procesarVentasPorLote = (
 
       for (const venta of ventas) {
         try {
-          await store.crear(venta);
+          // Validaciones básicas (igual que en crear individual)
+          if (!venta.userEmail || venta.userEmail.trim() === '') {
+            throw new Error('El email del usuario es requerido');
+          }
+
+          // Obtener el almacén del usuario desde Firebase
+          let almacenId: number;
+          try {
+            almacenId = await obtenerAlmacenDelUsuario(venta.userEmail);
+          } catch (error) {
+            throw new Error(`Error al obtener información del usuario: ${error instanceof Error ? error.message : String(error)}`);
+          }
+
+          // Validar stock disponible en el almacén del usuario
+          const validacionStock = await validarStockParaVenta(almacenId, venta.productos);
+          if (!validacionStock.valido) {
+            throw new Error(`Stock insuficiente: ${validacionStock.errores.join(', ')}`);
+          }
+
+          await store.crear(venta, almacenId);
           resultados.exitosas.push(venta.localSaleId);
         } catch (error) {
           resultados.fallidas.push({
