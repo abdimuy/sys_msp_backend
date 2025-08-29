@@ -1,4 +1,8 @@
 import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 import controller from './controller';
 import responses from '../../network/responses';
 import { 
@@ -10,9 +14,59 @@ import {
 
 const router = express.Router();
 
-router.post('/', async (req, res) => {
+// Configuración de Multer para imágenes de ventas locales
+const uploadDir = path.resolve("uploads/ventas-locales");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const uniqueId = uuidv4();
+    const localSaleId = req.body.localSaleId || 'unknown';
+    const name = `venta-${localSaleId}-${uniqueId}${ext}`;
+    cb(null, name);
+  },
+});
+
+const fileFilter = (
+  _req: any,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  if (/^image\/(jpeg|jpg|png|gif)$/.test(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Solo se permiten imágenes JPEG, PNG o GIF"));
+  }
+};
+
+const upload = multer({ 
+  storage, 
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB máximo por imagen
+    files: 10 // Máximo 10 imágenes por venta
+  }
+});
+
+// Endpoint con soporte para imágenes
+router.post('/', upload.array('imagenes'), async (req, res) => {
   try {
-    const datosVenta: IVentaLocalInput = req.body;
+    const datosVenta: IVentaLocalInput = JSON.parse(req.body.datos || '{}');
+    const files = req.files as Express.Multer.File[];
+    
+    // Agregar información de las imágenes subidas
+    if (files && files.length > 0) {
+      datosVenta.imagenes = files.map((file, index) => ({
+        descripcion: req.body[`descripcion_${index}`] || `Imagen ${index + 1}`,
+        archivo: file
+      }));
+    }
     
     const resultado = await controller.crear(datosVenta);
     
@@ -21,7 +75,8 @@ router.post('/', async (req, res) => {
       res,
       data: {
         ...resultado,
-        message: 'Venta local creada exitosamente'
+        message: 'Venta local creada exitosamente',
+        imagenesSubidas: files?.length || 0
       }
     });
   } catch (error: any) {

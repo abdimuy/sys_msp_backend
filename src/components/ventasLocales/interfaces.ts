@@ -78,6 +78,21 @@ export interface IVentaLocalInput {
   tiempoACortoPlazoMeses: number;
   montoACortoPlazo: number;
   productos: IProductoVentaLocalInput[];
+  imagenes?: IImagenVentaLocal[];
+}
+
+export interface IImagenVentaLocal {
+  descripcion?: string;
+  archivo?: Express.Multer.File;
+}
+
+export interface IImagenVentaLocalDB {
+  ID: string;
+  LOCAL_SALE_ID: string;
+  IMG_PATH: string;
+  IMG_MIME: string;
+  IMG_DESC: string;
+  FECHA_SUBIDA: Date | string;
 }
 
 export interface IProductoVentaLocalInput {

@@ -21,6 +21,9 @@ import {
   QUERY_DELETE_VENTA_LOCAL,
   QUERY_CHECK_ARTICULO_EXISTS,
   QUERY_GET_RESUMEN_VENTAS_LOCALES,
+  QUERY_INSERT_IMAGEN_VENTA_LOCAL,
+  QUERY_GET_IMAGENES_VENTA_LOCAL,
+  QUERY_DELETE_IMAGENES_VENTA_LOCAL,
 } from "./querys";
 import {
   IVentaLocalInput,
@@ -178,6 +181,24 @@ const crearVentaLocal = async (datosVenta: IVentaLocalInput, almacenId: number):
         producto.precioCortoPlazo,
         producto.precioContado,
       ]);
+    }
+
+    // Guardar imágenes si existen
+    if (datosVenta.imagenes && datosVenta.imagenes.length > 0) {
+      const { v4: uuidv4 } = await import('uuid');
+      
+      for (const imagen of datosVenta.imagenes) {
+        if (imagen.archivo) {
+          const imagenId = uuidv4();
+          await queryAsync(transaction, QUERY_INSERT_IMAGEN_VENTA_LOCAL, [
+            imagenId,
+            datosVenta.localSaleId.trim().toUpperCase(),
+            imagen.archivo.path,
+            imagen.archivo.mimetype,
+            normalizarTexto(imagen.descripcion || 'Imagen de venta'),
+          ]);
+        }
+      }
     }
 
     await commitTransactionAsync(transaction);
