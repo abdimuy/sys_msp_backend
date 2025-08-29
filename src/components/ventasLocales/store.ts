@@ -33,6 +33,7 @@ import {
   VENTA_LOCAL_CONFIG,
   IVentaLocalResult,
 } from "./interfaces";
+import traspasosController from "../traspasos/controller";
 
 const converterVentaLocal: IQueryConverter[] = [
   { type: "buffer", column: "LOCAL_SALE_ID" },
@@ -181,6 +182,24 @@ const crearVentaLocal = async (datosVenta: IVentaLocalInput, almacenId: number):
 
     await commitTransactionAsync(transaction);
     await detachDbAsync(db);
+
+    // Crear traspaso automático después de la venta
+    try {
+      const datosTraspaso = {
+        almacenOrigenId: almacenId,
+        almacenDestinoId: VENTA_LOCAL_CONFIG.ALMACEN_DESTINO_VENTAS,
+        descripcion: `Traspaso automático por venta local ${datosVenta.localSaleId}`,
+        detalles: datosVenta.productos.map(producto => ({
+          articuloId: producto.articuloId,
+          unidades: producto.cantidad
+        })),
+        usuario: datosVenta.userEmail
+      };
+
+      await traspasosController.crear(datosTraspaso);
+    } catch (traspasoError) {
+      console.warn(`Advertencia: No se pudo crear el traspaso para la venta ${datosVenta.localSaleId}:`, traspasoError);
+    }
 
     return {
       success: true,

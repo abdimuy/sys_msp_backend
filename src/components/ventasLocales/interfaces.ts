@@ -133,5 +133,6 @@ export class ErrorVentaLocal extends Error {
 
 export const VENTA_LOCAL_CONFIG = {
   USUARIO_DEFAULT: "SYSDBA",
-  ENVIADO_DEFAULT: false
+  ENVIADO_DEFAULT: false,
+  ALMACEN_DESTINO_VENTAS: 11058, // Almacén destino para traspasos de ventas locales
 };
