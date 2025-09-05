@@ -423,10 +423,24 @@ const obtenerVentaCompleta = async (localSaleId: string): Promise<any> => {
   }
 
   const productos = await obtenerProductosVentaLocal(localSaleId);
+  
+  // Obtener las imágenes de la venta
+  const imagenes = await query({
+    sql: QUERY_GET_IMAGENES_VENTA_LOCAL,
+    params: [localSaleId.trim().toUpperCase()],
+    converters: [
+      { type: "buffer", column: "ID" },
+      { type: "buffer", column: "LOCAL_SALE_ID" },
+      { type: "buffer", column: "IMG_PATH" },
+      { type: "buffer", column: "IMG_MIME" },
+      { type: "buffer", column: "IMG_DESC" }
+    ]
+  });
 
   return {
     ...venta,
     productos,
+    imagenes,
   };
 };
 
