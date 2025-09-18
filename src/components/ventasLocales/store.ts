@@ -353,12 +353,18 @@ const obtenerVentasLocales = async (
 
     if (filtros.fechaInicio) {
       conditions.push("V.FECHA_VENTA >= ?");
-      params.push(moment(filtros.fechaInicio).format("YYYY-MM-DD HH:mm:ss"));
+      const fechaInicio = moment(filtros.fechaInicio);
+      params.push(fechaInicio.startOf('day').format("YYYY-MM-DD HH:mm:ss"));
     }
 
     if (filtros.fechaFin) {
       conditions.push("V.FECHA_VENTA <= ?");
-      params.push(moment(filtros.fechaFin).format("YYYY-MM-DD HH:mm:ss"));
+      const fechaFin = moment(filtros.fechaFin);
+      if (fechaFin.hours() === 0 && fechaFin.minutes() === 0 && fechaFin.seconds() === 0) {
+        params.push(fechaFin.endOf('day').format("YYYY-MM-DD HH:mm:ss"));
+      } else {
+        params.push(fechaFin.format("YYYY-MM-DD HH:mm:ss"));
+      }
     }
 
     if (filtros.nombreCliente) {
@@ -497,12 +503,18 @@ const obtenerResumenVentas = async (
 
     if (filtros.fechaInicio) {
       conditions.push("V.FECHA_VENTA >= ?");
-      params.push(moment(filtros.fechaInicio).format("YYYY-MM-DD HH:mm:ss"));
+      const fechaInicio = moment(filtros.fechaInicio);
+      params.push(fechaInicio.startOf('day').format("YYYY-MM-DD HH:mm:ss"));
     }
 
     if (filtros.fechaFin) {
       conditions.push("V.FECHA_VENTA <= ?");
-      params.push(moment(filtros.fechaFin).format("YYYY-MM-DD HH:mm:ss"));
+      const fechaFin = moment(filtros.fechaFin);
+      if (fechaFin.hours() === 0 && fechaFin.minutes() === 0 && fechaFin.seconds() === 0) {
+        params.push(fechaFin.endOf('day').format("YYYY-MM-DD HH:mm:ss"));
+      } else {
+        params.push(fechaFin.format("YYYY-MM-DD HH:mm:ss"));
+      }
     }
 
     if (conditions.length > 0) {
