@@ -114,8 +114,8 @@ export async function createGarantiaWithImages(req: Request, res: Response) {
 
 export async function createGarantiaEvento(req: Request, res: Response) {
   try {
-    const garantiaId = req.params.id
-    if (garantiaId == "") {
+    const garantiaId = Number(req.params.id);
+    if (!req.params.id || isNaN(garantiaId) || garantiaId <= 0) {
       return responses.error({
         req,
         res,
@@ -152,7 +152,7 @@ export async function createGarantiaEvento(req: Request, res: Response) {
 
     const newEvent = await addGarantiaEvento(
       id,
-      garantiaId,
+      String(garantiaId),
       tipoEvento as EstadoGarantia,
       fechaEvento,
       comentario ? String(comentario).toUpperCase() : undefined

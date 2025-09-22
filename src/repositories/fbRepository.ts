@@ -85,12 +85,47 @@ function ab2str(buffer: any): string {
   // Si ya es string, devolverlo tal cual
   if (typeof buffer === "string") return buffer;
 
+  // Si es una función, es un BLOB de Firebird que necesita ser leído de forma sincrónica
+  if (typeof buffer === "function") {
+    // Crear un wrapper para leer el BLOB de manera sincrónica
+    let blobData = "";
+    let completed = false;
+
+    buffer((err: any, name: string, eventEmitter: any) => {
+      if (err) {
+        console.warn("Error reading BLOB:", err);
+        completed = true;
+        return;
+      }
+
+      let chunks: Uint8Array[] = [];
+      eventEmitter.on('data', (chunk: Buffer | Uint8Array) => {
+        chunks.push(chunk instanceof Buffer ? new Uint8Array(chunk) : chunk);
+      });
+
+      eventEmitter.on('end', () => {
+        const fullBuffer = Buffer.concat(chunks as any);
+        // Intentar decodificar como UTF-8 primero
+        blobData = fullBuffer.toString('utf8');
+        completed = true;
+      });
+    });
+
+    // Esperar un momento para que el BLOB se cargue (solución temporal)
+    // Nota: Esto no es ideal, pero Firebird no provee una forma sincrónica
+    const start = Date.now();
+    while (!completed && Date.now() - start < 100) {
+      // Esperar hasta 100ms
+    }
+
+    return blobData;
+  }
+
   // Verificar que sea un buffer válido
   if (!Buffer.isBuffer(buffer) && !ArrayBuffer.isView(buffer)) {
     console.warn(
       "ab2str: Received invalid buffer type:",
-      typeof buffer,
-      buffer
+      typeof buffer
     );
     return "";
   }
