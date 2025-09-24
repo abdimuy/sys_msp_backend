@@ -114,14 +114,16 @@ export async function createGarantiaWithImages(req: Request, res: Response) {
 
 export async function createGarantiaEvento(req: Request, res: Response) {
   try {
-    const garantiaId = Number(req.params.id);
-    if (!req.params.id || isNaN(garantiaId) || garantiaId <= 0) {
+    const externalId = req.params.id;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!externalId || !uuidRegex.test(externalId)) {
       return responses.error({
         req,
         res,
         status: 400,
-        error: 'ID de garantía inválido',
-        details: `Param id="${req.params.id}" no es un entero válido`
+        error: 'External ID de garantía inválido',
+        details: `Param id="${req.params.id}" no es un UUID válido`
       });
     }
 
@@ -152,7 +154,7 @@ export async function createGarantiaEvento(req: Request, res: Response) {
 
     const newEvent = await addGarantiaEvento(
       id,
-      String(garantiaId),
+      externalId,
       tipoEvento as EstadoGarantia,
       fechaEvento,
       comentario ? String(comentario).toUpperCase() : undefined

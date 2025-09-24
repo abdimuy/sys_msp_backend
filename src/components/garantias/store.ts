@@ -253,7 +253,7 @@ export async function addGarantiaWithImages(
  */
 export async function addGarantiaEvento(
   idEvento: string,
-  garantiaId: string,
+  externalId: string,
   nuevoEstado: EstadoGarantia,
   fechaEvento: string,
   comentario?: string
@@ -289,20 +289,16 @@ export async function addGarantiaEvento(
       SET ESTADO = ?, FECHA_ULT_ACT = CURRENT_TIMESTAMP
       WHERE EXTERNAL_ID = ?
     `;
-    console.log("updateGarantiaSQL", updateGarantiaSQL)
-    console.log("nuevoEstado", nuevoEstado)
-    console.log("garantiaId", garantiaId)
 
-    await queryAsync(transaction, updateGarantiaSQL, [nuevoEstado, garantiaId]);
+    await queryAsync(transaction, updateGarantiaSQL, [nuevoEstado, externalId]);
 
     const getIDByExternalIDQuery = `
       SELECT ID
       FROM MSP_GARANTIAS
       WHERE EXTERNAL_ID = ?;
     `
-    console.log("getIDByExternalIDQuery", getIDByExternalIDQuery)
     const res = await queryAsync(transaction, getIDByExternalIDQuery, [
-      garantiaId
+      externalId
     ])
     const idGarantiaInt = res[0].ID as number
 
@@ -313,7 +309,6 @@ export async function addGarantiaEvento(
       VALUES (?, ?, ?, ?, ?)
       RETURNING ID, GARANTIA_ID, TIPO_EVENTO, FECHA_EVENTO, COMENTARIO
     `;
-    console.log("insertEventoSQL", insertEventoSQL)
 
     const result = await queryAsync(transaction, insertEventoSQL, [
       idEvento,
@@ -322,8 +317,7 @@ export async function addGarantiaEvento(
       fechaEvento,
       comentario ?? null,
     ]);
-    console.log("result", result)
-
+    
     await commitTransactionAsync(transaction);
     return result[0] as GarantiaEventoRow;
 
