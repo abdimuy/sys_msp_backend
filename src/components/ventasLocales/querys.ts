@@ -18,8 +18,13 @@ export const QUERY_INSERT_VENTA_LOCAL = `
     PRECIO_TOTAL,
     TIEMPO_A_CORTO_PLAZOMESES,
     MONTO_A_CORTO_PLAZO,
-    ENVIADO
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true)
+    ENVIADO,
+    NUMERO,
+    COLONIA,
+    POBLACION,
+    CIUDAD,
+    TIPO_VENTA
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true, ?, ?, ?, ?, ?)
   RETURNING LOCAL_SALE_ID
 `;
 
@@ -42,7 +47,7 @@ export const QUERY_CHECK_VENTA_EXISTS = `
 `;
 
 export const QUERY_GET_VENTAS_LOCALES = `
-  SELECT 
+  SELECT
     V.LOCAL_SALE_ID,
     V.USER_EMAIL,
     V.ALMACEN_ID,
@@ -61,13 +66,18 @@ export const QUERY_GET_VENTAS_LOCALES = `
     V.PRECIO_TOTAL,
     V.TIEMPO_A_CORTO_PLAZOMESES,
     V.MONTO_A_CORTO_PLAZO,
-    V.ENVIADO
+    V.ENVIADO,
+    V.NUMERO,
+    V.COLONIA,
+    V.POBLACION,
+    V.CIUDAD,
+    V.TIPO_VENTA
   FROM MSP_LOCAL_SALE V
   WHERE 1=1
 `;
 
 export const QUERY_GET_VENTA_LOCAL_BY_ID = `
-  SELECT 
+  SELECT
     V.LOCAL_SALE_ID,
     V.USER_EMAIL,
     V.ALMACEN_ID,
@@ -86,7 +96,12 @@ export const QUERY_GET_VENTA_LOCAL_BY_ID = `
     V.PRECIO_TOTAL,
     V.TIEMPO_A_CORTO_PLAZOMESES,
     V.MONTO_A_CORTO_PLAZO,
-    V.ENVIADO
+    V.ENVIADO,
+    V.NUMERO,
+    V.COLONIA,
+    V.POBLACION,
+    V.CIUDAD,
+    V.TIPO_VENTA
   FROM MSP_LOCAL_SALE V
   WHERE V.LOCAL_SALE_ID = ?
 `;
@@ -107,7 +122,7 @@ export const QUERY_GET_PRODUCTOS_VENTA_LOCAL = `
 
 export const QUERY_UPDATE_VENTA_LOCAL = `
   UPDATE MSP_LOCAL_SALE
-  SET 
+  SET
     USER_EMAIL = ?,
     ALMACEN_ID = ?,
     NOMBRE_CLIENTE = ?,
@@ -125,7 +140,12 @@ export const QUERY_UPDATE_VENTA_LOCAL = `
     PRECIO_TOTAL = ?,
     TIEMPO_A_CORTO_PLAZOMESES = ?,
     MONTO_A_CORTO_PLAZO = ?,
-    ENVIADO = true
+    ENVIADO = true,
+    NUMERO = ?,
+    COLONIA = ?,
+    POBLACION = ?,
+    CIUDAD = ?,
+    TIPO_VENTA = ?
   WHERE LOCAL_SALE_ID = ?
 `;
 

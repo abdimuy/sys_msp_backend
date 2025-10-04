@@ -16,6 +16,11 @@ export interface IVentaLocal {
   tiempoACortoPlazoMeses: number;
   montoACortoPlazo: number;
   productos: IProductoVentaLocal[];
+  numero?: string;
+  colonia?: string;
+  poblacion?: string;
+  ciudad?: string;
+  tipoVenta?: 'CONTADO' | 'CREDITO';
 }
 
 export interface IProductoVentaLocal {
@@ -47,6 +52,11 @@ export interface IVentaLocalDB {
   TIEMPO_A_CORTO_PLAZOMESES: number;
   MONTO_A_CORTO_PLAZO: number;
   ENVIADO: boolean | null;
+  NUMERO?: string | null;
+  COLONIA?: string | null;
+  POBLACION?: string | null;
+  CIUDAD?: string | null;
+  TIPO_VENTA?: string | null;
 }
 
 export interface IProductoVentaLocalDB {
@@ -79,6 +89,11 @@ export interface IVentaLocalInput {
   montoACortoPlazo: number;
   productos: IProductoVentaLocalInput[];
   imagenes?: IImagenVentaLocal[];
+  numero?: string;
+  colonia?: string;
+  poblacion?: string;
+  ciudad?: string;
+  tipoVenta?: 'CONTADO' | 'CREDITO';
 }
 
 export interface IImagenVentaLocal {
@@ -120,7 +135,8 @@ export enum TipoErrorVentaLocal {
   ERROR_DUPLICADO = 'ERROR_DUPLICADO',
   ERROR_PARAMETROS = 'ERROR_PARAMETROS',
   ERROR_TECNICO = 'ERROR_TECNICO',
-  ERROR_ARTICULO_NO_EXISTE = 'ERROR_ARTICULO_NO_EXISTE'
+  ERROR_ARTICULO_NO_EXISTE = 'ERROR_ARTICULO_NO_EXISTE',
+  ERROR_TIPO_VENTA_INVALIDO = 'ERROR_TIPO_VENTA_INVALIDO'
 }
 
 export class ErrorVentaLocal extends Error {

@@ -48,6 +48,11 @@ const converterVentaLocal: IQueryConverter[] = [
   { type: "buffer", column: "AVAL_O_RESPONSABLE" },
   { type: "buffer", column: "NOTA" },
   { type: "buffer", column: "DIA_COBRANZA" },
+  { type: "buffer", column: "NUMERO" },
+  { type: "buffer", column: "COLONIA" },
+  { type: "buffer", column: "POBLACION" },
+  { type: "buffer", column: "CIUDAD" },
+  { type: "buffer", column: "TIPO_VENTA" },
 ];
 
 const converterProducto: IQueryConverter[] = [
@@ -83,6 +88,24 @@ const normalizarTexto = (texto: string | null | undefined): string => {
 const normalizarEspacios = (texto: string | null | undefined): string => {
   if (!texto) return "";
   return texto.trim().replace(/\s+/g, " ");
+};
+
+// Función para validar tipo de venta
+const validarTipoVenta = (tipoVenta: string | undefined): string => {
+  if (!tipoVenta) return "CONTADO";
+
+  const tipoNormalizado = tipoVenta.toUpperCase().trim();
+
+  if (tipoNormalizado !== "CONTADO" && tipoNormalizado !== "CREDITO") {
+    throw new ErrorVentaLocal(
+      TipoErrorVentaLocal.ERROR_TIPO_VENTA_INVALIDO,
+      "Tipo de venta inválido. Solo se acepta CONTADO o CREDITO",
+      [`Tipo de venta '${tipoVenta}' no es válido`],
+      "TIPO_VENTA_INVALIDO"
+    );
+  }
+
+  return tipoNormalizado;
 };
 
 const verificarArticuloExiste = async (
@@ -149,6 +172,9 @@ const crearVentaLocal = async (
 
     const fechaFormateada = fechaVenta.format("YYYY-MM-DD HH:mm:ss.SSS");
 
+    // Validar tipo de venta
+    const tipoVenta = validarTipoVenta(datosVenta.tipoVenta);
+
     await queryAsync(
       transaction,
       QUERY_INSERT_VENTA_LOCAL.replace(" RETURNING LOCAL_SALE_ID", ""),
@@ -171,6 +197,11 @@ const crearVentaLocal = async (
         datosVenta.precioTotal,
         datosVenta.tiempoACortoPlazoMeses,
         datosVenta.montoACortoPlazo,
+        normalizarTexto(datosVenta.numero) || null,
+        normalizarTexto(datosVenta.colonia) || null,
+        normalizarTexto(datosVenta.poblacion) || null,
+        normalizarTexto(datosVenta.ciudad) || null,
+        tipoVenta,
       ]
     );
 
@@ -289,6 +320,9 @@ const actualizarVentaLocal = async (
 
     const fechaFormateada = fechaVenta.format("YYYY-MM-DD HH:mm:ss.SSS");
 
+    // Validar tipo de venta
+    const tipoVenta = validarTipoVenta(datosVenta.tipoVenta);
+
     await queryAsync(transaction, QUERY_UPDATE_VENTA_LOCAL, [
       datosVenta.userEmail.trim().toLowerCase(),
       almacenId,
@@ -307,6 +341,11 @@ const actualizarVentaLocal = async (
       datosVenta.precioTotal,
       datosVenta.tiempoACortoPlazoMeses,
       datosVenta.montoACortoPlazo,
+      normalizarTexto(datosVenta.numero) || null,
+      normalizarTexto(datosVenta.colonia) || null,
+      normalizarTexto(datosVenta.poblacion) || null,
+      normalizarTexto(datosVenta.ciudad) || null,
+      tipoVenta,
       localSaleId.trim().toUpperCase(),
     ]);
 
