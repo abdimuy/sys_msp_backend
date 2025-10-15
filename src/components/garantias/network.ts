@@ -36,7 +36,13 @@ const fileFilter = (
   }
 };
 
-const upload = multer({ storage, fileFilter });
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20 MB por archivo
+  },
+});
 
 // Ruta: GET /garantias/activa
 router.get("/activa", async (req, res) => {
@@ -69,6 +75,13 @@ router.post(
 
 // POST /garantias/:id/eventos
 router.post('/:id/eventos', createGarantiaEvento);
+
+// POST /garantias/:id/eventos-con-imagenes (nuevo endpoint con multipart)
+router.post(
+  '/:id/eventos-con-imagenes',
+  upload.array('imagenes', 10),
+  controller.createGarantiaEventoWithImages
+);
 
 // GET /garantias/:id/eventos
 router.get('/:id/eventos', listGarantiaEventos);

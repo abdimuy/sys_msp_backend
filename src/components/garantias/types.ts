@@ -5,6 +5,7 @@ export interface GarantiaImageRow {
   IMG_MIME: string;
   IMG_DESC: string;
   FECHA_SUBIDA: string;
+  EVENTO_ID: string | null;
 }
 
 export interface UploadedFile {
@@ -41,6 +42,7 @@ export type GarantiaEventoRow = {
   TIPO_EVENTO: string;
   FECHA_EVENTO: string;
   COMENTARIO: string | null;
+  IMAGENES?: GarantiaImageRow[];
 };
 
 export const AllowedEstados = [
