@@ -59,7 +59,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB máximo por imagen
+    fileSize: 100 * 1024 * 1024, // 100 MB máximo por imagen
     files: 10, // Máximo 10 imágenes por venta
   },
 });
