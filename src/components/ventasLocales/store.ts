@@ -127,6 +127,25 @@ const verificarArticuloExiste = async (
   }
 };
 
+const verificarVentaExiste = async (
+  localSaleId: string
+): Promise<boolean> => {
+  try {
+    const result = await query<ICheckExistsResult>({
+      sql: QUERY_CHECK_VENTA_EXISTS,
+      params: [localSaleId.trim().toUpperCase()],
+    });
+    return result[0].EXISTE > 0;
+  } catch (error) {
+    throw new ErrorVentaLocal(
+      TipoErrorVentaLocal.ERROR_TECNICO,
+      "Error al verificar existencia de la venta",
+      [error instanceof Error ? error.message : String(error)],
+      "ERROR_BD_VERIFICAR_VENTA"
+    );
+  }
+};
+
 const crearVentaLocal = async (
   datosVenta: IVentaLocalInput,
   almacenId: number
@@ -135,19 +154,7 @@ const crearVentaLocal = async (
   const transaction = await getDbTransactionAsync(db);
 
   try {
-    const existeResult = await query<ICheckExistsResult>({
-      sql: QUERY_CHECK_VENTA_EXISTS,
-      params: [datosVenta.localSaleId.trim().toUpperCase()],
-    });
-
-    if (existeResult[0].EXISTE > 0) {
-      throw new ErrorVentaLocal(
-        TipoErrorVentaLocal.ERROR_DUPLICADO,
-        `Ya existe una venta con el ID ${datosVenta.localSaleId}`,
-        [`La venta con ID ${datosVenta.localSaleId} ya fue registrada`],
-        "VENTA_DUPLICADA"
-      );
-    }
+    // Validación de duplicado movida al controller para idempotencia
 
     const articulosInvalidos: number[] = [];
     for (const producto of datosVenta.productos) {
@@ -237,29 +244,24 @@ const crearVentaLocal = async (
       }
     }
 
+    // Crear traspaso automático DENTRO de la misma transacción
+    const datosTraspaso = {
+      almacenOrigenId: almacenId,
+      almacenDestinoId: VENTA_LOCAL_CONFIG.ALMACEN_DESTINO_VENTAS,
+      descripcion: `Traspaso automático por venta local ${datosVenta.localSaleId}`,
+      detalles: datosVenta.productos.map((producto) => ({
+        articuloId: producto.articuloId,
+        unidades: producto.cantidad,
+      })),
+      usuario: datosVenta.userEmail,
+    };
+
+    // Pasar la transacción actual al controller de traspasos
+    await traspasosController.crear(datosTraspaso, transaction, db);
+
+    // Commit DESPUÉS de que todo esté listo (venta + traspaso)
     await commitTransactionAsync(transaction);
     await detachDbAsync(db);
-
-    // Crear traspaso automático después de la venta
-    try {
-      const datosTraspaso = {
-        almacenOrigenId: almacenId,
-        almacenDestinoId: VENTA_LOCAL_CONFIG.ALMACEN_DESTINO_VENTAS,
-        descripcion: `Traspaso automático por venta local ${datosVenta.localSaleId}`,
-        detalles: datosVenta.productos.map((producto) => ({
-          articuloId: producto.articuloId,
-          unidades: producto.cantidad,
-        })),
-        usuario: datosVenta.userEmail,
-      };
-
-      await traspasosController.crear(datosTraspaso);
-    } catch (traspasoError) {
-      console.warn(
-        `Advertencia: No se pudo crear el traspaso para la venta ${datosVenta.localSaleId}:`,
-        traspasoError
-      );
-    }
 
     return {
       success: true,
@@ -578,4 +580,5 @@ export default {
   obtenerCompleta: obtenerVentaCompleta,
   eliminar: eliminarVentaLocal,
   obtenerResumen: obtenerResumenVentas,
+  verificarVentaExiste: verificarVentaExiste,
 };

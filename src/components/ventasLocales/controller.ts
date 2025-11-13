@@ -94,6 +94,21 @@ const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
         );
       }
 
+      // Validar si la venta ya existe (IDEMPOTENCIA)
+      const yaExiste = await store.verificarVentaExiste(datosVenta.localSaleId);
+      if (yaExiste) {
+        // La venta ya existe y como ahora venta+traspaso están en la misma transacción,
+        // sabemos que está completamente procesada. Retornamos éxito (idempotencia).
+        resolve({
+          success: true,
+          localSaleId: datosVenta.localSaleId,
+          mensaje: `Venta local con ID ${datosVenta.localSaleId} ya fue procesada anteriormente`,
+          yaExistia: true,
+          productosRegistrados: 0
+        });
+        return;
+      }
+
       // Obtener el almacén del usuario desde Firebase
       let almacenId: number;
       try {

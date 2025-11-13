@@ -273,9 +273,15 @@ const validarExistencias = async (
 };
 
 // Crear traspaso completo
-const crearTraspaso = async (datosTraspaso: ITraspaso): Promise<any> => {
-  const db = await getDbConnectionAsync();
-  const transaction = await getDbTransactionAsync(db);
+const crearTraspaso = async (
+  datosTraspaso: ITraspaso,
+  transactionExterna?: Firebird.Transaction,
+  dbExterna?: Firebird.Database
+): Promise<any> => {
+  // Si se proporciona una transacción externa, usarla (no crear nueva ni hacer commit)
+  const usarTransaccionExterna = !!transactionExterna;
+  const db = dbExterna || await getDbConnectionAsync();
+  const transaction = transactionExterna || await getDbTransactionAsync(db);
 
   try {
     // Validar existencias antes de proceder usando SALDOS_IN
@@ -426,8 +432,11 @@ const crearTraspaso = async (datosTraspaso: ITraspaso): Promise<any> => {
     // Aplicar documento (actualizar inventarios) - sin RETURNING
     await queryAsync(transaction, QUERY_APLICA_DOCTO, [doctoInId]);
 
-    await commitTransactionAsync(transaction);
-    await detachDbAsync(db);
+    // Solo hacer commit y detach si NO estamos usando transacción externa
+    if (!usarTransaccionExterna) {
+      await commitTransactionAsync(transaction);
+      await detachDbAsync(db);
+    }
 
     return {
       success: true,
@@ -436,8 +445,11 @@ const crearTraspaso = async (datosTraspaso: ITraspaso): Promise<any> => {
       mensaje: `Traspaso creado exitosamente con folio ${folio}`,
     };
   } catch (error) {
-    await rollbackTransactionAsync(transaction);
-    await detachDbAsync(db);
+    // Solo hacer rollback y detach si NO estamos usando transacción externa
+    if (!usarTransaccionExterna) {
+      await rollbackTransactionAsync(transaction);
+      await detachDbAsync(db);
+    }
     throw error;
   }
 };

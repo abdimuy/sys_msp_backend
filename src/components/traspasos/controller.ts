@@ -1,8 +1,13 @@
 import store from './store';
 import { ITraspaso, IDetalleTraspasoInput } from './interfaces';
+import Firebird from 'node-firebird';
 
 // Crear un nuevo traspaso
-const crearTraspaso = (datosTraspaso: ITraspaso): Promise<any> => {
+const crearTraspaso = (
+  datosTraspaso: ITraspaso,
+  transactionExterna?: Firebird.Transaction,
+  dbExterna?: Firebird.Database
+): Promise<any> => {
   return new Promise(async (resolve, reject) => {
     try {
       // Validaciones básicas
@@ -29,8 +34,8 @@ const crearTraspaso = (datosTraspaso: ITraspaso): Promise<any> => {
         }
       }
       
-      // Crear el traspaso
-      const resultado = await store.crear(datosTraspaso);
+      // Crear el traspaso (pasar transacción y db si existen)
+      const resultado = await store.crear(datosTraspaso, transactionExterna, dbExterna);
       resolve(resultado);
       
     } catch (error) {
