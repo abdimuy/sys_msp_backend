@@ -283,6 +283,8 @@ const crearTraspaso = async (
   const db = dbExterna || await getDbConnectionAsync();
   const transaction = transactionExterna || await getDbTransactionAsync(db);
 
+  let folio: string = '';
+
   try {
     // Validar existencias antes de proceder usando SALDOS_IN
     await validarExistencias(
@@ -290,7 +292,7 @@ const crearTraspaso = async (
       datosTraspaso.detalles
     );
 
-    const folio = await generateNextFolio(
+    folio = await generateNextFolio(
       TRASPASO_CONFIG.CONCEPTO_SALIDA_ID
     );
 
