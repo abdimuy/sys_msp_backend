@@ -21,6 +21,7 @@ export interface IVentaLocal {
   poblacion?: string;
   ciudad?: string;
   tipoVenta?: 'CONTADO' | 'CREDITO';
+  zonaClienteId?: number;
 }
 
 export interface IProductoVentaLocal {
@@ -57,6 +58,8 @@ export interface IVentaLocalDB {
   POBLACION?: string | null;
   CIUDAD?: string | null;
   TIPO_VENTA?: string | null;
+  ZONA_CLIENTE_ID?: number | null;
+  ZONA_CLIENTE?: string | null;
 }
 
 export interface IProductoVentaLocalDB {
@@ -94,6 +97,7 @@ export interface IVentaLocalInput {
   poblacion?: string;
   ciudad?: string;
   tipoVenta?: 'CONTADO' | 'CREDITO';
+  zonaClienteId?: number;
 }
 
 export interface IImagenVentaLocal {
@@ -127,6 +131,7 @@ export interface IFiltrosVentasLocales {
   fechaInicio?: Date | string;
   fechaFin?: Date | string;
   nombreCliente?: string;
+  zonaClienteId?: number;
   limit?: number;
   offset?: number;
 }

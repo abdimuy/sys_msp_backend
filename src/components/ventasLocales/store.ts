@@ -53,6 +53,7 @@ const converterVentaLocal: IQueryConverter[] = [
   { type: "buffer", column: "POBLACION" },
   { type: "buffer", column: "CIUDAD" },
   { type: "buffer", column: "TIPO_VENTA" },
+  { type: "buffer", column: "ZONA_CLIENTE" },
 ];
 
 const converterProducto: IQueryConverter[] = [
@@ -209,6 +210,7 @@ const crearVentaLocal = async (
         normalizarTexto(datosVenta.poblacion) || null,
         normalizarTexto(datosVenta.ciudad) || null,
         tipoVenta,
+        datosVenta.zonaClienteId || null,
       ]
     );
 
@@ -348,6 +350,7 @@ const actualizarVentaLocal = async (
       normalizarTexto(datosVenta.poblacion) || null,
       normalizarTexto(datosVenta.ciudad) || null,
       tipoVenta,
+      datosVenta.zonaClienteId || null,
       localSaleId.trim().toUpperCase(),
     ]);
 
@@ -411,6 +414,11 @@ const obtenerVentasLocales = async (
     if (filtros.nombreCliente) {
       conditions.push("UPPER(V.NOMBRE_CLIENTE) LIKE UPPER(?)");
       params.push(`%${filtros.nombreCliente}%`);
+    }
+
+    if (filtros.zonaClienteId) {
+      conditions.push("V.ZONA_CLIENTE_ID = ?");
+      params.push(filtros.zonaClienteId);
     }
 
     if (conditions.length > 0) {

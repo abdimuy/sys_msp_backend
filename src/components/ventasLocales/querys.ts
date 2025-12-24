@@ -23,8 +23,9 @@ export const QUERY_INSERT_VENTA_LOCAL = `
     COLONIA,
     POBLACION,
     CIUDAD,
-    TIPO_VENTA
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true, ?, ?, ?, ?, ?)
+    TIPO_VENTA,
+    ZONA_CLIENTE_ID
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?)
   RETURNING LOCAL_SALE_ID
 `;
 
@@ -71,8 +72,11 @@ export const QUERY_GET_VENTAS_LOCALES = `
     V.COLONIA,
     V.POBLACION,
     V.CIUDAD,
-    V.TIPO_VENTA
+    V.TIPO_VENTA,
+    V.ZONA_CLIENTE_ID,
+    Z.NOMBRE AS ZONA_CLIENTE
   FROM MSP_LOCAL_SALE V
+  LEFT JOIN ZONAS_CLIENTES Z ON V.ZONA_CLIENTE_ID = Z.ZONA_CLIENTE_ID
   WHERE 1=1
 `;
 
@@ -101,8 +105,11 @@ export const QUERY_GET_VENTA_LOCAL_BY_ID = `
     V.COLONIA,
     V.POBLACION,
     V.CIUDAD,
-    V.TIPO_VENTA
+    V.TIPO_VENTA,
+    V.ZONA_CLIENTE_ID,
+    Z.NOMBRE AS ZONA_CLIENTE
   FROM MSP_LOCAL_SALE V
+  LEFT JOIN ZONAS_CLIENTES Z ON V.ZONA_CLIENTE_ID = Z.ZONA_CLIENTE_ID
   WHERE V.LOCAL_SALE_ID = ?
 `;
 
@@ -145,7 +152,8 @@ export const QUERY_UPDATE_VENTA_LOCAL = `
     COLONIA = ?,
     POBLACION = ?,
     CIUDAD = ?,
-    TIPO_VENTA = ?
+    TIPO_VENTA = ?,
+    ZONA_CLIENTE_ID = ?
   WHERE LOCAL_SALE_ID = ?
 `;
 
