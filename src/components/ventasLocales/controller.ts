@@ -1,104 +1,130 @@
 import store from './store';
-import { 
-  IVentaLocalInput, 
+import {
+  IVentaLocalInput,
   IFiltrosVentasLocales,
   ErrorVentaLocal,
-  TipoErrorVentaLocal 
+  TipoErrorVentaLocal
 } from './interfaces';
 import { obtenerAlmacenDelUsuario } from '../../services/firebaseUserService';
 import { validarStockParaVenta } from '../../services/inventarioService';
 
+/**
+ * Valida los campos básicos de una venta local
+ */
+const validarCamposBasicos = (datosVenta: IVentaLocalInput, esCreacion: boolean = true): void => {
+  if (esCreacion && !datosVenta.localSaleId) {
+    throw new ErrorVentaLocal(
+      TipoErrorVentaLocal.ERROR_PARAMETROS,
+      'El ID de la venta local es requerido',
+      ['localSaleId es un campo obligatorio'],
+      'ID_VENTA_REQUERIDO'
+    );
+  }
+
+  if (!datosVenta.userEmail || datosVenta.userEmail.trim() === '') {
+    throw new ErrorVentaLocal(
+      TipoErrorVentaLocal.ERROR_PARAMETROS,
+      'El email del usuario es requerido',
+      ['userEmail es un campo obligatorio'],
+      'USER_EMAIL_REQUERIDO'
+    );
+  }
+
+  if (!datosVenta.nombreCliente || datosVenta.nombreCliente.trim() === '') {
+    throw new ErrorVentaLocal(
+      TipoErrorVentaLocal.ERROR_PARAMETROS,
+      'El nombre del cliente es requerido',
+      ['nombreCliente no puede estar vacío'],
+      'NOMBRE_CLIENTE_REQUERIDO'
+    );
+  }
+
+  if (!datosVenta.productos || datosVenta.productos.length === 0) {
+    throw new ErrorVentaLocal(
+      TipoErrorVentaLocal.ERROR_PARAMETROS,
+      'Debe incluir al menos un producto en la venta',
+      ['La lista de productos no puede estar vacía'],
+      'PRODUCTOS_REQUERIDOS'
+    );
+  }
+
+  for (const producto of datosVenta.productos) {
+    if (!producto.articuloId) {
+      throw new ErrorVentaLocal(
+        TipoErrorVentaLocal.ERROR_PARAMETROS,
+        'Todos los productos deben tener ID de artículo',
+        ['articuloId es requerido para cada producto'],
+        'ARTICULO_ID_REQUERIDO'
+      );
+    }
+
+    if (producto.cantidad <= 0) {
+      throw new ErrorVentaLocal(
+        TipoErrorVentaLocal.ERROR_PARAMETROS,
+        'La cantidad debe ser mayor a cero',
+        [`Producto ${producto.articulo}: cantidad inválida`],
+        'CANTIDAD_INVALIDA'
+      );
+    }
+
+    if (producto.precioLista < 0 || producto.precioCortoPlazo < 0 || producto.precioContado < 0) {
+      throw new ErrorVentaLocal(
+        TipoErrorVentaLocal.ERROR_PARAMETROS,
+        'Los precios no pueden ser negativos',
+        [`Producto ${producto.articulo}: precios inválidos`],
+        'PRECIOS_INVALIDOS'
+      );
+    }
+  }
+
+  if (datosVenta.latitud < -90 || datosVenta.latitud > 90) {
+    throw new ErrorVentaLocal(
+      TipoErrorVentaLocal.ERROR_PARAMETROS,
+      'Latitud inválida',
+      ['La latitud debe estar entre -90 y 90'],
+      'LATITUD_INVALIDA'
+    );
+  }
+
+  if (datosVenta.longitud < -180 || datosVenta.longitud > 180) {
+    throw new ErrorVentaLocal(
+      TipoErrorVentaLocal.ERROR_PARAMETROS,
+      'Longitud inválida',
+      ['La longitud debe estar entre -180 y 180'],
+      'LONGITUD_INVALIDA'
+    );
+  }
+};
+
+/**
+ * Obtiene el almacén origen: usa el proporcionado en datosVenta o lo obtiene de Firebase
+ */
+const obtenerAlmacenOrigen = async (datosVenta: IVentaLocalInput): Promise<number> => {
+  if (datosVenta.almacenOrigenId) {
+    return datosVenta.almacenOrigenId;
+  }
+
+  try {
+    return await obtenerAlmacenDelUsuario(datosVenta.userEmail);
+  } catch (error) {
+    throw new ErrorVentaLocal(
+      TipoErrorVentaLocal.ERROR_PARAMETROS,
+      'Error al obtener información del usuario',
+      [error instanceof Error ? error.message : String(error)],
+      'ERROR_USUARIO_FIREBASE'
+    );
+  }
+};
+
 const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
   return new Promise(async (resolve, reject) => {
     try {
-      if (!datosVenta.localSaleId) {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'El ID de la venta local es requerido',
-          ['localSaleId es un campo obligatorio'],
-          'ID_VENTA_REQUERIDO'
-        );
-      }
-
-      if (!datosVenta.userEmail || datosVenta.userEmail.trim() === '') {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'El email del usuario es requerido',
-          ['userEmail es un campo obligatorio'],
-          'USER_EMAIL_REQUERIDO'
-        );
-      }
-
-      if (!datosVenta.nombreCliente || datosVenta.nombreCliente.trim() === '') {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'El nombre del cliente es requerido',
-          ['nombreCliente no puede estar vacío'],
-          'NOMBRE_CLIENTE_REQUERIDO'
-        );
-      }
-
-      if (!datosVenta.productos || datosVenta.productos.length === 0) {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'Debe incluir al menos un producto en la venta',
-          ['La lista de productos no puede estar vacía'],
-          'PRODUCTOS_REQUERIDOS'
-        );
-      }
-
-      for (const producto of datosVenta.productos) {
-        if (!producto.articuloId) {
-          throw new ErrorVentaLocal(
-            TipoErrorVentaLocal.ERROR_PARAMETROS,
-            'Todos los productos deben tener ID de artículo',
-            ['articuloId es requerido para cada producto'],
-            'ARTICULO_ID_REQUERIDO'
-          );
-        }
-
-        if (producto.cantidad <= 0) {
-          throw new ErrorVentaLocal(
-            TipoErrorVentaLocal.ERROR_PARAMETROS,
-            'La cantidad debe ser mayor a cero',
-            [`Producto ${producto.articulo}: cantidad inválida`],
-            'CANTIDAD_INVALIDA'
-          );
-        }
-
-        if (producto.precioLista < 0 || producto.precioCortoPlazo < 0 || producto.precioContado < 0) {
-          throw new ErrorVentaLocal(
-            TipoErrorVentaLocal.ERROR_PARAMETROS,
-            'Los precios no pueden ser negativos',
-            [`Producto ${producto.articulo}: precios inválidos`],
-            'PRECIOS_INVALIDOS'
-          );
-        }
-      }
-
-      if (datosVenta.latitud < -90 || datosVenta.latitud > 90) {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'Latitud inválida',
-          ['La latitud debe estar entre -90 y 90'],
-          'LATITUD_INVALIDA'
-        );
-      }
-
-      if (datosVenta.longitud < -180 || datosVenta.longitud > 180) {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'Longitud inválida',
-          ['La longitud debe estar entre -180 y 180'],
-          'LONGITUD_INVALIDA'
-        );
-      }
+      // Validar campos básicos
+      validarCamposBasicos(datosVenta, true);
 
       // Validar si la venta ya existe (IDEMPOTENCIA)
       const yaExiste = await store.verificarVentaExiste(datosVenta.localSaleId);
       if (yaExiste) {
-        // La venta ya existe y como ahora venta+traspaso están en la misma transacción,
-        // sabemos que está completamente procesada. Retornamos éxito (idempotencia).
         resolve({
           success: true,
           localSaleId: datosVenta.localSaleId,
@@ -109,33 +135,28 @@ const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
         return;
       }
 
-      // Obtener el almacén del usuario desde Firebase
-      let almacenId: number;
-      try {
-        almacenId = await obtenerAlmacenDelUsuario(datosVenta.userEmail);
-      } catch (error) {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'Error al obtener información del usuario',
-          [error instanceof Error ? error.message : String(error)],
-          'ERROR_USUARIO_FIREBASE'
-        );
-      }
+      // Obtener almacén origen
+      const almacenOrigenId = await obtenerAlmacenOrigen(datosVenta);
 
-      // Validar stock disponible en el almacén del usuario
-      const validacionStock = await validarStockParaVenta(almacenId, datosVenta.productos);
+      // Validar stock disponible en el almacén origen
+      const validacionStock = await validarStockParaVenta(almacenOrigenId, datosVenta.productos);
       if (!validacionStock.valido) {
         throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_ARTICULO_NO_EXISTE,
+          TipoErrorVentaLocal.ERROR_STOCK_INSUFICIENTE,
           'Stock insuficiente para realizar la venta',
           validacionStock.errores,
           'STOCK_INSUFICIENTE'
         );
       }
 
-      const resultado = await store.crear(datosVenta, almacenId);
+      // Crear la venta con almacén destino opcional
+      const resultado = await store.crear(
+        datosVenta,
+        almacenOrigenId,
+        datosVenta.almacenDestinoId
+      );
       resolve(resultado);
-      
+
     } catch (error) {
       reject(error);
     }
@@ -157,60 +178,21 @@ const actualizarVentaLocal = (
         );
       }
 
-      if (!datosVenta.userEmail || datosVenta.userEmail.trim() === '') {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'El email del usuario es requerido',
-          ['userEmail es un campo obligatorio'],
-          'USER_EMAIL_REQUERIDO'
-        );
-      }
+      // Validar campos básicos (sin validar localSaleId porque viene como parámetro)
+      validarCamposBasicos(datosVenta, false);
 
-      if (!datosVenta.nombreCliente || datosVenta.nombreCliente.trim() === '') {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'El nombre del cliente es requerido',
-          ['nombreCliente no puede estar vacío'],
-          'NOMBRE_CLIENTE_REQUERIDO'
-        );
-      }
+      // Obtener almacén origen
+      const almacenOrigenId = await obtenerAlmacenOrigen(datosVenta);
 
-      if (!datosVenta.productos || datosVenta.productos.length === 0) {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'Debe incluir al menos un producto en la venta',
-          ['La lista de productos no puede estar vacía'],
-          'PRODUCTOS_REQUERIDOS'
-        );
-      }
-
-      // Obtener el almacén del usuario desde Firebase
-      let almacenId: number;
-      try {
-        almacenId = await obtenerAlmacenDelUsuario(datosVenta.userEmail);
-      } catch (error) {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_PARAMETROS,
-          'Error al obtener información del usuario',
-          [error instanceof Error ? error.message : String(error)],
-          'ERROR_USUARIO_FIREBASE'
-        );
-      }
-
-      // Validar stock disponible en el almacén del usuario
-      const validacionStock = await validarStockParaVenta(almacenId, datosVenta.productos);
-      if (!validacionStock.valido) {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_ARTICULO_NO_EXISTE,
-          'Stock insuficiente para actualizar la venta',
-          validacionStock.errores,
-          'STOCK_INSUFICIENTE'
-        );
-      }
-
-      const resultado = await store.actualizar(localSaleId, datosVenta, almacenId);
+      // El store se encarga de validar stock y crear traspasos de ajuste
+      const resultado = await store.actualizar(
+        localSaleId,
+        datosVenta,
+        almacenOrigenId,
+        datosVenta.almacenDestinoId
+      );
       resolve(resultado);
-      
+
     } catch (error) {
       reject(error);
     }
@@ -305,26 +287,21 @@ const procesarVentasPorLote = (
 
       for (const venta of ventas) {
         try {
-          // Validaciones básicas (igual que en crear individual)
+          // Validaciones básicas
           if (!venta.userEmail || venta.userEmail.trim() === '') {
             throw new Error('El email del usuario es requerido');
           }
 
-          // Obtener el almacén del usuario desde Firebase
-          let almacenId: number;
-          try {
-            almacenId = await obtenerAlmacenDelUsuario(venta.userEmail);
-          } catch (error) {
-            throw new Error(`Error al obtener información del usuario: ${error instanceof Error ? error.message : String(error)}`);
-          }
+          // Obtener almacén origen
+          const almacenOrigenId = await obtenerAlmacenOrigen(venta);
 
-          // Validar stock disponible en el almacén del usuario
-          const validacionStock = await validarStockParaVenta(almacenId, venta.productos);
+          // Validar stock disponible en el almacén origen
+          const validacionStock = await validarStockParaVenta(almacenOrigenId, venta.productos);
           if (!validacionStock.valido) {
             throw new Error(`Stock insuficiente: ${validacionStock.errores.join(', ')}`);
           }
 
-          await store.crear(venta, almacenId);
+          await store.crear(venta, almacenOrigenId, venta.almacenDestinoId);
           resultados.exitosas.push(venta.localSaleId);
         } catch (error) {
           resultados.fallidas.push({
@@ -339,7 +316,7 @@ const procesarVentasPorLote = (
         porcentajeExito: (resultados.exitosas.length / resultados.totales) * 100,
         mensaje: `Procesadas ${resultados.exitosas.length} de ${resultados.totales} ventas`,
       });
-      
+
     } catch (error) {
       reject(error);
     }

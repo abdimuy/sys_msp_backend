@@ -3,6 +3,7 @@ export const QUERY_INSERT_VENTA_LOCAL = `
     LOCAL_SALE_ID,
     USER_EMAIL,
     ALMACEN_ID,
+    ALMACEN_DESTINO_ID,
     NOMBRE_CLIENTE,
     FECHA_VENTA,
     LATITUD,
@@ -25,7 +26,7 @@ export const QUERY_INSERT_VENTA_LOCAL = `
     CIUDAD,
     TIPO_VENTA,
     ZONA_CLIENTE_ID
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true, ?, ?, ?, ?, ?, ?)
   RETURNING LOCAL_SALE_ID
 `;
 
@@ -52,6 +53,7 @@ export const QUERY_GET_VENTAS_LOCALES = `
     V.LOCAL_SALE_ID,
     V.USER_EMAIL,
     V.ALMACEN_ID,
+    V.ALMACEN_DESTINO_ID,
     V.NOMBRE_CLIENTE,
     V.FECHA_VENTA,
     V.LATITUD,
@@ -85,6 +87,7 @@ export const QUERY_GET_VENTA_LOCAL_BY_ID = `
     V.LOCAL_SALE_ID,
     V.USER_EMAIL,
     V.ALMACEN_ID,
+    V.ALMACEN_DESTINO_ID,
     V.NOMBRE_CLIENTE,
     V.FECHA_VENTA,
     V.LATITUD,
@@ -132,6 +135,7 @@ export const QUERY_UPDATE_VENTA_LOCAL = `
   SET
     USER_EMAIL = ?,
     ALMACEN_ID = ?,
+    ALMACEN_DESTINO_ID = ?,
     NOMBRE_CLIENTE = ?,
     FECHA_VENTA = ?,
     LATITUD = ?,
@@ -210,4 +214,15 @@ export const QUERY_GET_IMAGENES_VENTA_LOCAL = `
 export const QUERY_DELETE_IMAGENES_VENTA_LOCAL = `
   DELETE FROM MSP_LOCAL_SALE_IMAGES
   WHERE LOCAL_SALE_ID = ?
+`;
+
+export const QUERY_DELETE_IMAGEN_POR_ID = `
+  DELETE FROM MSP_LOCAL_SALE_IMAGES
+  WHERE ID = ?
+`;
+
+export const QUERY_GET_IMAGEN_POR_ID = `
+  SELECT IMG_PATH
+  FROM MSP_LOCAL_SALE_IMAGES
+  WHERE ID = ?
 `;

@@ -73,6 +73,7 @@ router.post("/", upload.array("imagenes"), async (req, res) => {
     // Agregar información de las imágenes subidas
     if (files && files.length > 0) {
       datosVenta.imagenes = files.map((file, index) => ({
+        id: req.body[`id_${index}`] || undefined,
         descripcion: req.body[`descripcion_${index}`] || `Imagen ${index + 1}`,
         archivo: file,
       }));
@@ -98,6 +99,8 @@ router.post("/", upload.array("imagenes"), async (req, res) => {
           ? 400
           : error.tipo === TipoErrorVentaLocal.ERROR_ARTICULO_NO_EXISTE
           ? 422
+          : error.tipo === TipoErrorVentaLocal.ERROR_STOCK_INSUFICIENTE
+          ? 409
           : 500;
 
       return responses.error({
@@ -155,13 +158,14 @@ router.post("/lote", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const { fechaInicio, fechaFin, nombreCliente, limit, offset } = req.query;
+    const { fechaInicio, fechaFin, nombreCliente, zonaClienteId, limit, offset } = req.query;
 
     const filtros: IFiltrosVentasLocales = {};
 
     if (fechaInicio) filtros.fechaInicio = fechaInicio as string;
     if (fechaFin) filtros.fechaFin = fechaFin as string;
     if (nombreCliente) filtros.nombreCliente = nombreCliente as string;
+    if (zonaClienteId) filtros.zonaClienteId = parseInt(zonaClienteId as string);
     if (limit) filtros.limit = parseInt(limit as string);
     if (offset) filtros.offset = parseInt(offset as string);
 
@@ -241,10 +245,28 @@ router.get("/:localSaleId", async (req, res) => {
   }
 });
 
-router.put("/:localSaleId", async (req, res) => {
+router.put("/:localSaleId", upload.array("imagenes"), async (req, res) => {
   try {
     const { localSaleId } = req.params;
-    const datosVenta: IVentaLocalInput = req.body;
+
+    // Soportar tanto JSON directo como multipart form data
+    let datosVenta: IVentaLocalInput;
+    if (req.body.datos) {
+      datosVenta = JSON.parse(req.body.datos);
+    } else {
+      datosVenta = req.body;
+    }
+
+    const files = req.files as Express.Multer.File[];
+
+    // Agregar información de las imágenes nuevas subidas
+    if (files && files.length > 0) {
+      datosVenta.imagenes = files.map((file, index) => ({
+        id: req.body[`id_${index}`] || undefined,
+        descripcion: req.body[`descripcion_${index}`] || `Imagen ${index + 1}`,
+        archivo: file,
+      }));
+    }
 
     const resultado = await controller.actualizar(localSaleId, datosVenta);
 
@@ -254,6 +276,7 @@ router.put("/:localSaleId", async (req, res) => {
       data: {
         ...resultado,
         message: "Venta local actualizada exitosamente",
+        imagenesSubidas: files?.length || 0,
       },
     });
   } catch (error: any) {
@@ -263,6 +286,8 @@ router.put("/:localSaleId", async (req, res) => {
           ? 400
           : error.tipo === TipoErrorVentaLocal.ERROR_ARTICULO_NO_EXISTE
           ? 422
+          : error.tipo === TipoErrorVentaLocal.ERROR_STOCK_INSUFICIENTE
+          ? 409
           : 500;
 
       return responses.error({

@@ -37,6 +37,7 @@ export interface IVentaLocalDB {
   LOCAL_SALE_ID: string;
   USER_EMAIL: string;
   ALMACEN_ID: number;
+  ALMACEN_DESTINO_ID?: number | null;
   NOMBRE_CLIENTE: string;
   FECHA_VENTA: Date | string;
   LATITUD: number;
@@ -98,9 +99,13 @@ export interface IVentaLocalInput {
   ciudad?: string;
   tipoVenta?: 'CONTADO' | 'CREDITO';
   zonaClienteId?: number;
+  almacenOrigenId?: number;
+  almacenDestinoId?: number;
+  imagenesAEliminar?: string[];
 }
 
 export interface IImagenVentaLocal {
+  id?: string;
   descripcion?: string;
   archivo?: Express.Multer.File;
 }
@@ -141,7 +146,8 @@ export enum TipoErrorVentaLocal {
   ERROR_PARAMETROS = 'ERROR_PARAMETROS',
   ERROR_TECNICO = 'ERROR_TECNICO',
   ERROR_ARTICULO_NO_EXISTE = 'ERROR_ARTICULO_NO_EXISTE',
-  ERROR_TIPO_VENTA_INVALIDO = 'ERROR_TIPO_VENTA_INVALIDO'
+  ERROR_TIPO_VENTA_INVALIDO = 'ERROR_TIPO_VENTA_INVALIDO',
+  ERROR_STOCK_INSUFICIENTE = 'ERROR_STOCK_INSUFICIENTE'
 }
 
 export class ErrorVentaLocal extends Error {
@@ -172,3 +178,17 @@ export const VENTA_LOCAL_CONFIG = {
   ENVIADO_DEFAULT: false,
   ALMACEN_DESTINO_VENTAS: 11058, // Almacén destino para traspasos de ventas locales
 };
+
+export interface IDiferenciaProducto {
+  articuloId: number;
+  articulo: string;
+  cantidadOriginal: number;
+  cantidadNueva: number;
+  diferencia: number; // positivo = agregar, negativo = devolver
+}
+
+export interface IResultadoComparacionProductos {
+  productosADevolver: IDiferenciaProducto[]; // Del destino al origen
+  productosASacar: IDiferenciaProducto[];    // Del origen al destino
+  sinCambios: boolean;
+}
