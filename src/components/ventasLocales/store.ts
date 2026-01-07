@@ -26,6 +26,9 @@ import {
   QUERY_DELETE_IMAGENES_VENTA_LOCAL,
   QUERY_DELETE_IMAGEN_POR_ID,
   QUERY_GET_IMAGEN_POR_ID,
+  QUERY_INSERT_COMBO_VENTA_LOCAL,
+  QUERY_GET_COMBOS_VENTA_LOCAL,
+  QUERY_DELETE_COMBOS_VENTA_LOCAL,
 } from "./querys";
 import {
   IVentaLocalInput,
@@ -39,6 +42,7 @@ import {
   IVentaLocalResult,
   IDiferenciaProducto,
   IResultadoComparacionProductos,
+  IComboVentaLocalDB,
 } from "./interfaces";
 import traspasosStore from "../traspasos/store";
 import traspasosController from "../traspasos/controller";
@@ -64,6 +68,13 @@ const converterVentaLocal: IQueryConverter[] = [
 const converterProducto: IQueryConverter[] = [
   { type: "buffer", column: "LOCAL_SALE_ID" },
   { type: "buffer", column: "ARTICULO" },
+  { type: "buffer", column: "COMBO_ID" },
+];
+
+const converterCombo: IQueryConverter[] = [
+  { type: "buffer", column: "COMBO_ID" },
+  { type: "buffer", column: "LOCAL_SALE_ID" },
+  { type: "buffer", column: "NOMBRE_COMBO" },
 ];
 
 interface ICheckExistsResult {
@@ -155,7 +166,8 @@ const verificarVentaExiste = async (
 const crearVentaLocal = async (
   datosVenta: IVentaLocalInput,
   almacenOrigenId: number,
-  almacenDestinoId?: number
+  almacenDestinoId?: number,
+  omitirTraspaso?: boolean
 ): Promise<any> => {
   const db = await getDbConnectionAsync();
   const transaction = await getDbTransactionAsync(db);
@@ -224,6 +236,20 @@ const crearVentaLocal = async (
       ]
     );
 
+    // Guardar combos si existen
+    if (datosVenta.combos && datosVenta.combos.length > 0) {
+      for (const combo of datosVenta.combos) {
+        await queryAsync(transaction, QUERY_INSERT_COMBO_VENTA_LOCAL, [
+          combo.comboId.trim().toUpperCase(),
+          datosVenta.localSaleId.trim().toUpperCase(),
+          normalizarTexto(combo.nombreCombo),
+          combo.precioLista || 0,
+          combo.precioCortoPlazo || 0,
+          combo.precioContado || 0,
+        ]);
+      }
+    }
+
     for (const producto of datosVenta.productos) {
       await queryAsync(transaction, QUERY_INSERT_PRODUCTO_VENTA_LOCAL, [
         datosVenta.localSaleId.trim().toUpperCase(),
@@ -233,6 +259,7 @@ const crearVentaLocal = async (
         producto.precioLista,
         producto.precioCortoPlazo,
         producto.precioContado,
+        producto.comboId ? producto.comboId.trim().toUpperCase() : null,
       ]);
     }
 
@@ -256,32 +283,38 @@ const crearVentaLocal = async (
       }
     }
 
-    // Crear traspaso automático DENTRO de la misma transacción
-    const datosTraspaso = {
-      almacenOrigenId: almacenOrigenId,
-      almacenDestinoId: almacenDestino,
-      descripcion: `Traspaso automático por venta local ${datosVenta.localSaleId}`,
-      detalles: datosVenta.productos.map((producto) => ({
-        articuloId: producto.articuloId,
-        unidades: producto.cantidad,
-      })),
-      usuario: datosVenta.userEmail,
-    };
+    // Crear traspaso automático DENTRO de la misma transacción (si no se omite)
+    if (!omitirTraspaso) {
+      const datosTraspaso = {
+        almacenOrigenId: almacenOrigenId,
+        almacenDestinoId: almacenDestino,
+        descripcion: `Traspaso automático por venta local ${datosVenta.localSaleId}`,
+        detalles: datosVenta.productos.map((producto) => ({
+          articuloId: producto.articuloId,
+          unidades: producto.cantidad,
+        })),
+        usuario: datosVenta.userEmail,
+      };
 
-    // Pasar la transacción actual al controller de traspasos
-    await traspasosController.crear(datosTraspaso, transaction, db);
+      // Pasar la transacción actual al controller de traspasos
+      await traspasosController.crear(datosTraspaso, transaction, db);
+    }
 
-    // Commit DESPUÉS de que todo esté listo (venta + traspaso)
+    // Commit DESPUÉS de que todo esté listo (venta + traspaso si aplica)
     await commitTransactionAsync(transaction);
     await detachDbAsync(db);
 
     return {
       success: true,
       localSaleId: datosVenta.localSaleId,
-      mensaje: `Venta local creada exitosamente con ID ${datosVenta.localSaleId}`,
+      mensaje: omitirTraspaso
+        ? `Venta local creada exitosamente (sin traspaso de inventario)`
+        : `Venta local creada exitosamente con ID ${datosVenta.localSaleId}`,
       productosRegistrados: datosVenta.productos.length,
+      combosRegistrados: datosVenta.combos?.length || 0,
       almacenOrigenId,
       almacenDestinoId: almacenDestino,
+      traspasoOmitido: omitirTraspaso || false,
     };
   } catch (error) {
     await rollbackTransactionAsync(transaction);
@@ -622,11 +655,32 @@ const actualizarVentaLocal = async (
       localSaleIdNormalizado,
     ]);
 
-    // 10. Actualizar productos (eliminar anteriores e insertar nuevos)
+    // 10. Actualizar combos y productos (eliminar anteriores e insertar nuevos)
+    // Primero eliminar productos (por FK constraint)
     await queryAsync(transaction, QUERY_DELETE_PRODUCTOS_VENTA_LOCAL, [
       localSaleIdNormalizado,
     ]);
 
+    // Luego eliminar combos
+    await queryAsync(transaction, QUERY_DELETE_COMBOS_VENTA_LOCAL, [
+      localSaleIdNormalizado,
+    ]);
+
+    // Insertar nuevos combos si existen
+    if (datosVenta.combos && datosVenta.combos.length > 0) {
+      for (const combo of datosVenta.combos) {
+        await queryAsync(transaction, QUERY_INSERT_COMBO_VENTA_LOCAL, [
+          combo.comboId.trim().toUpperCase(),
+          localSaleIdNormalizado,
+          normalizarTexto(combo.nombreCombo),
+          combo.precioLista || 0,
+          combo.precioCortoPlazo || 0,
+          combo.precioContado || 0,
+        ]);
+      }
+    }
+
+    // Insertar productos con comboId si aplica
     for (const producto of datosVenta.productos) {
       await queryAsync(transaction, QUERY_INSERT_PRODUCTO_VENTA_LOCAL, [
         localSaleIdNormalizado,
@@ -636,6 +690,7 @@ const actualizarVentaLocal = async (
         producto.precioLista,
         producto.precioCortoPlazo,
         producto.precioContado,
+        producto.comboId ? producto.comboId.trim().toUpperCase() : null,
       ]);
     }
 
@@ -744,6 +799,16 @@ const obtenerProductosVentaLocal = async (
   });
 };
 
+const obtenerCombosVentaLocal = async (
+  localSaleId: string
+): Promise<IComboVentaLocalDB[]> => {
+  return await query<IComboVentaLocalDB>({
+    sql: QUERY_GET_COMBOS_VENTA_LOCAL,
+    params: [localSaleId.trim().toUpperCase()],
+    converters: converterCombo,
+  });
+};
+
 const obtenerVentaCompleta = async (localSaleId: string): Promise<any> => {
   const venta = await obtenerVentaLocalPorId(localSaleId);
 
@@ -757,7 +822,8 @@ const obtenerVentaCompleta = async (localSaleId: string): Promise<any> => {
   }
 
   const productos = await obtenerProductosVentaLocal(localSaleId);
-  
+  const combos = await obtenerCombosVentaLocal(localSaleId);
+
   // Obtener las imágenes de la venta
   const imagenes = await query({
     sql: QUERY_GET_IMAGENES_VENTA_LOCAL,
@@ -774,6 +840,7 @@ const obtenerVentaCompleta = async (localSaleId: string): Promise<any> => {
   return {
     ...venta,
     productos,
+    combos,
     imagenes,
   };
 };
@@ -864,6 +931,7 @@ export default {
   listar: obtenerVentasLocales,
   obtenerPorId: obtenerVentaLocalPorId,
   obtenerProductos: obtenerProductosVentaLocal,
+  obtenerCombos: obtenerCombosVentaLocal,
   obtenerCompleta: obtenerVentaCompleta,
   eliminar: eliminarVentaLocal,
   obtenerResumen: obtenerResumenVentas,

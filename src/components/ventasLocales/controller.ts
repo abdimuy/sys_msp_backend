@@ -94,6 +94,69 @@ const validarCamposBasicos = (datosVenta: IVentaLocalInput, esCreacion: boolean 
       'LONGITUD_INVALIDA'
     );
   }
+
+  // Validar combos si existen
+  if (datosVenta.combos && datosVenta.combos.length > 0) {
+    const comboIds = new Set<string>();
+
+    for (const combo of datosVenta.combos) {
+      if (!combo.comboId || combo.comboId.trim() === '') {
+        throw new ErrorVentaLocal(
+          TipoErrorVentaLocal.ERROR_PARAMETROS,
+          'Todos los combos deben tener un ID',
+          ['comboId es requerido para cada combo'],
+          'COMBO_ID_REQUERIDO'
+        );
+      }
+
+      if (!combo.nombreCombo || combo.nombreCombo.trim() === '') {
+        throw new ErrorVentaLocal(
+          TipoErrorVentaLocal.ERROR_PARAMETROS,
+          'Todos los combos deben tener un nombre',
+          [`Combo ${combo.comboId}: nombreCombo es requerido`],
+          'COMBO_NOMBRE_REQUERIDO'
+        );
+      }
+
+      if (combo.precioLista < 0 || combo.precioCortoPlazo < 0 || combo.precioContado < 0) {
+        throw new ErrorVentaLocal(
+          TipoErrorVentaLocal.ERROR_PARAMETROS,
+          'Los precios del combo no pueden ser negativos',
+          [`Combo ${combo.nombreCombo}: precios inválidos`],
+          'COMBO_PRECIOS_INVALIDOS'
+        );
+      }
+
+      comboIds.add(combo.comboId.trim().toUpperCase());
+    }
+
+    // Validar que los productos con comboId referencien combos existentes
+    for (const producto of datosVenta.productos) {
+      if (producto.comboId) {
+        const comboIdNormalizado = producto.comboId.trim().toUpperCase();
+        if (!comboIds.has(comboIdNormalizado)) {
+          throw new ErrorVentaLocal(
+            TipoErrorVentaLocal.ERROR_PARAMETROS,
+            'Producto referencia un combo inexistente',
+            [`Producto ${producto.articulo} referencia comboId "${producto.comboId}" que no existe en la lista de combos`],
+            'COMBO_NO_ENCONTRADO'
+          );
+        }
+      }
+    }
+  } else {
+    // Si no hay combos, verificar que ningún producto tenga comboId
+    for (const producto of datosVenta.productos) {
+      if (producto.comboId) {
+        throw new ErrorVentaLocal(
+          TipoErrorVentaLocal.ERROR_PARAMETROS,
+          'Producto tiene comboId pero no hay combos definidos',
+          [`Producto ${producto.articulo} tiene comboId "${producto.comboId}" pero no se enviaron combos`],
+          'COMBO_NO_DEFINIDO'
+        );
+      }
+    }
+  }
 };
 
 /**
@@ -138,22 +201,28 @@ const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
       // Obtener almacén origen
       const almacenOrigenId = await obtenerAlmacenOrigen(datosVenta);
 
-      // Validar stock disponible en el almacén origen
-      const validacionStock = await validarStockParaVenta(almacenOrigenId, datosVenta.productos);
-      if (!validacionStock.valido) {
-        throw new ErrorVentaLocal(
-          TipoErrorVentaLocal.ERROR_STOCK_INSUFICIENTE,
-          'Stock insuficiente para realizar la venta',
-          validacionStock.errores,
-          'STOCK_INSUFICIENTE'
-        );
+      // Cambiar a true para omitir traspasos por defecto (pruebas)
+      const omitirTraspaso = datosVenta.omitirTraspaso ?? false;
+
+      // Validar stock disponible en el almacén origen (si no se omite traspaso)
+      if (!omitirTraspaso) {
+        const validacionStock = await validarStockParaVenta(almacenOrigenId, datosVenta.productos);
+        if (!validacionStock.valido) {
+          throw new ErrorVentaLocal(
+            TipoErrorVentaLocal.ERROR_STOCK_INSUFICIENTE,
+            'Stock insuficiente para realizar la venta',
+            validacionStock.errores,
+            'STOCK_INSUFICIENTE'
+          );
+        }
       }
 
       // Crear la venta con almacén destino opcional
       const resultado = await store.crear(
         datosVenta,
         almacenOrigenId,
-        datosVenta.almacenDestinoId
+        datosVenta.almacenDestinoId,
+        omitirTraspaso
       );
       resolve(resultado);
 

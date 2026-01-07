@@ -31,6 +31,33 @@ export interface IProductoVentaLocal {
   precioLista: number;
   precioCortoPlazo: number;
   precioContado: number;
+  comboId?: string | null;
+}
+
+// Interfaces para combos
+export interface IComboVentaLocal {
+  comboId: string;
+  nombreCombo: string;
+  precioLista: number;
+  precioCortoPlazo: number;
+  precioContado: number;
+}
+
+export interface IComboVentaLocalInput {
+  comboId: string;
+  nombreCombo: string;
+  precioLista: number;
+  precioCortoPlazo: number;
+  precioContado: number;
+}
+
+export interface IComboVentaLocalDB {
+  COMBO_ID: string;
+  LOCAL_SALE_ID: string;
+  NOMBRE_COMBO: string;
+  PRECIO_LISTA: number;
+  PRECIO_CORTO_PLAZO: number;
+  PRECIO_CONTADO: number;
 }
 
 export interface IVentaLocalDB {
@@ -71,6 +98,7 @@ export interface IProductoVentaLocalDB {
   PRECIO_LISTA: number;
   PRECIO_CORTO_PLAZO: number;
   PRECIO_CONTADO: number;
+  COMBO_ID?: string | null;
 }
 
 export interface IVentaLocalInput {
@@ -92,6 +120,7 @@ export interface IVentaLocalInput {
   tiempoACortoPlazoMeses: number;
   montoACortoPlazo: number;
   productos: IProductoVentaLocalInput[];
+  combos?: IComboVentaLocalInput[];
   imagenes?: IImagenVentaLocal[];
   numero?: string;
   colonia?: string;
@@ -102,6 +131,7 @@ export interface IVentaLocalInput {
   almacenOrigenId?: number;
   almacenDestinoId?: number;
   imagenesAEliminar?: string[];
+  omitirTraspaso?: boolean; // Para pruebas: no crea traspaso ni valida stock
 }
 
 export interface IImagenVentaLocal {
@@ -126,6 +156,7 @@ export interface IProductoVentaLocalInput {
   precioLista: number;
   precioCortoPlazo: number;
   precioContado: number;
+  comboId?: string | null;
 }
 
 export interface IVentaLocalResult {
