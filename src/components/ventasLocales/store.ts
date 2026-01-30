@@ -29,6 +29,8 @@ import {
   QUERY_INSERT_COMBO_VENTA_LOCAL,
   QUERY_GET_COMBOS_VENTA_LOCAL,
   QUERY_DELETE_COMBOS_VENTA_LOCAL,
+  QUERY_GET_VENTAS_LOCALES_V2_BASE,
+  QUERY_COUNT_VENTAS_LOCALES_BASE,
 } from "./querys";
 import {
   IVentaLocalInput,
@@ -36,6 +38,11 @@ import {
   IVentaLocalDB,
   IProductoVentaLocalDB,
   IFiltrosVentasLocales,
+  IFiltrosVentasLocalesV2,
+  ICursorData,
+  IPaginatedResponse,
+  SortField,
+  SortOrder,
   ErrorVentaLocal,
   TipoErrorVentaLocal,
   VENTA_LOCAL_CONFIG,
@@ -925,10 +932,333 @@ const obtenerResumenVentas = async (
   return result[0];
 };
 
+// ===============================================
+// PAGINACIÓN POR CURSOR (World Class)
+// ===============================================
+
+const SORT_FIELD_MAP: Record<SortField, string> = {
+  fechaVenta: 'V.FECHA_VENTA',
+  nombreCliente: 'V.NOMBRE_CLIENTE',
+  precioTotal: 'V.PRECIO_TOTAL',
+  ciudad: 'V.CIUDAD',
+  tipoVenta: 'V.TIPO_VENTA',
+};
+
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 100;
+
+/**
+ * Codifica datos del cursor a base64
+ */
+const encodeCursor = (data: ICursorData): string => {
+  return Buffer.from(JSON.stringify(data)).toString('base64');
+};
+
+/**
+ * Decodifica cursor de base64 a datos
+ */
+const decodeCursor = (cursor: string): ICursorData | null => {
+  try {
+    const decoded = Buffer.from(cursor, 'base64').toString('utf-8');
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Construye las condiciones WHERE dinámicamente
+ */
+const buildWhereConditions = (
+  filtros: IFiltrosVentasLocalesV2,
+  params: any[]
+): string => {
+  const conditions: string[] = [];
+
+  // Filtros de fecha
+  if (filtros.fechaInicio) {
+    conditions.push("V.FECHA_VENTA >= ?");
+    const fechaInicio = moment(filtros.fechaInicio);
+    params.push(fechaInicio.startOf('day').format("YYYY-MM-DD HH:mm:ss"));
+  }
+
+  if (filtros.fechaFin) {
+    conditions.push("V.FECHA_VENTA <= ?");
+    const fechaFin = moment(filtros.fechaFin);
+    if (fechaFin.hours() === 0 && fechaFin.minutes() === 0 && fechaFin.seconds() === 0) {
+      params.push(fechaFin.endOf('day').format("YYYY-MM-DD HH:mm:ss"));
+    } else {
+      params.push(fechaFin.format("YYYY-MM-DD HH:mm:ss"));
+    }
+  }
+
+  // Filtros de texto (búsqueda parcial con LIKE)
+  if (filtros.nombreCliente) {
+    conditions.push("UPPER(V.NOMBRE_CLIENTE) LIKE UPPER(?)");
+    params.push(`%${filtros.nombreCliente}%`);
+  }
+
+  if (filtros.telefono) {
+    conditions.push("V.TELEFONO LIKE ?");
+    params.push(`%${filtros.telefono}%`);
+  }
+
+  if (filtros.direccion) {
+    conditions.push("UPPER(V.DIRECCION) LIKE UPPER(?)");
+    params.push(`%${filtros.direccion}%`);
+  }
+
+  if (filtros.ciudad) {
+    conditions.push("UPPER(V.CIUDAD) LIKE UPPER(?)");
+    params.push(`%${filtros.ciudad}%`);
+  }
+
+  if (filtros.colonia) {
+    conditions.push("UPPER(V.COLONIA) LIKE UPPER(?)");
+    params.push(`%${filtros.colonia}%`);
+  }
+
+  if (filtros.poblacion) {
+    conditions.push("UPPER(V.POBLACION) LIKE UPPER(?)");
+    params.push(`%${filtros.poblacion}%`);
+  }
+
+  // Filtros exactos
+  if (filtros.zonaClienteId) {
+    conditions.push("V.ZONA_CLIENTE_ID = ?");
+    params.push(filtros.zonaClienteId);
+  }
+
+  if (filtros.tipoVenta) {
+    conditions.push("V.TIPO_VENTA = ?");
+    params.push(filtros.tipoVenta.toUpperCase());
+  }
+
+  if (filtros.userEmail) {
+    conditions.push("LOWER(V.USER_EMAIL) = LOWER(?)");
+    params.push(filtros.userEmail);
+  }
+
+  if (filtros.almacenId) {
+    conditions.push("V.ALMACEN_ID = ?");
+    params.push(filtros.almacenId);
+  }
+
+  if (filtros.enviado !== undefined) {
+    conditions.push("V.ENVIADO = ?");
+    params.push(filtros.enviado);
+  }
+
+  // Filtros de rango numérico
+  if (filtros.precioMin !== undefined) {
+    conditions.push("V.PRECIO_TOTAL >= ?");
+    params.push(filtros.precioMin);
+  }
+
+  if (filtros.precioMax !== undefined) {
+    conditions.push("V.PRECIO_TOTAL <= ?");
+    params.push(filtros.precioMax);
+  }
+
+  // Búsqueda general (busca en múltiples campos)
+  if (filtros.search) {
+    const searchTerm = `%${filtros.search}%`;
+    conditions.push(`(
+      UPPER(V.NOMBRE_CLIENTE) LIKE UPPER(?) OR
+      V.TELEFONO LIKE ? OR
+      UPPER(V.DIRECCION) LIKE UPPER(?) OR
+      UPPER(V.CIUDAD) LIKE UPPER(?) OR
+      UPPER(V.COLONIA) LIKE UPPER(?) OR
+      V.LOCAL_SALE_ID LIKE UPPER(?)
+    )`);
+    params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+  }
+
+  return conditions.length > 0 ? ` AND ${conditions.join(" AND ")}` : "";
+};
+
+/**
+ * Construye la condición del cursor para paginación
+ */
+const buildCursorCondition = (
+  cursorData: ICursorData,
+  sortBy: SortField,
+  sortOrder: SortOrder,
+  params: any[]
+): string => {
+  const sortColumn = SORT_FIELD_MAP[sortBy];
+  const operator = sortOrder === 'desc' ? '<' : '>';
+
+  // Para ordenamiento descendente: queremos registros anteriores al cursor
+  // Para ordenamiento ascendente: queremos registros posteriores al cursor
+  // Usamos (sortColumn, LOCAL_SALE_ID) como clave compuesta para garantizar unicidad
+
+  if (sortBy === 'fechaVenta') {
+    // Caso especial: ordenamiento por fecha (campo principal)
+    params.push(cursorData.fechaVenta, cursorData.fechaVenta, cursorData.localSaleId);
+    return ` AND (
+      V.FECHA_VENTA ${operator} ? OR
+      (V.FECHA_VENTA = ? AND V.LOCAL_SALE_ID ${operator} ?)
+    )`;
+  } else {
+    // Ordenamiento por otro campo + fecha como desempate
+    params.push(
+      cursorData.sortValue,
+      cursorData.sortValue,
+      cursorData.fechaVenta,
+      cursorData.sortValue,
+      cursorData.fechaVenta,
+      cursorData.localSaleId
+    );
+    return ` AND (
+      ${sortColumn} ${operator} ? OR
+      (${sortColumn} = ? AND V.FECHA_VENTA ${operator} ?) OR
+      (${sortColumn} = ? AND V.FECHA_VENTA = ? AND V.LOCAL_SALE_ID ${operator} ?)
+    )`;
+  }
+};
+
+/**
+ * Obtiene el valor de ordenamiento de un registro para el cursor
+ */
+const getSortValue = (record: IVentaLocalDB, sortBy: SortField): string | number => {
+  switch (sortBy) {
+    case 'fechaVenta':
+      return moment(record.FECHA_VENTA).format("YYYY-MM-DD HH:mm:ss.SSS");
+    case 'nombreCliente':
+      return record.NOMBRE_CLIENTE || '';
+    case 'precioTotal':
+      return record.PRECIO_TOTAL || 0;
+    case 'ciudad':
+      return record.CIUDAD || '';
+    case 'tipoVenta':
+      return record.TIPO_VENTA || '';
+    default:
+      return moment(record.FECHA_VENTA).format("YYYY-MM-DD HH:mm:ss.SSS");
+  }
+};
+
+/**
+ * Listado de ventas locales con paginación por cursor (V2 - World Class)
+ */
+const obtenerVentasLocalesV2 = async (
+  filtros: IFiltrosVentasLocalesV2 = {}
+): Promise<IPaginatedResponse<IVentaLocalDB>> => {
+  // Validar y normalizar parámetros
+  const limit = Math.min(Math.max(filtros.limit || DEFAULT_LIMIT, 1), MAX_LIMIT);
+  const sortBy: SortField = filtros.sortBy || 'fechaVenta';
+  const sortOrder: SortOrder = filtros.sortOrder || 'desc';
+
+  const params: any[] = [];
+  let sql = QUERY_GET_VENTAS_LOCALES_V2_BASE;
+
+  // Agregar condiciones WHERE
+  sql += buildWhereConditions(filtros, params);
+
+  // Procesar cursor si existe
+  let cursorData: ICursorData | null = null;
+  if (filtros.cursor) {
+    cursorData = decodeCursor(filtros.cursor);
+    if (cursorData) {
+      sql += buildCursorCondition(cursorData, sortBy, sortOrder, params);
+    }
+  }
+
+  // Agregar ORDER BY
+  const sortColumn = SORT_FIELD_MAP[sortBy];
+  const orderDirection = sortOrder.toUpperCase();
+
+  if (sortBy === 'fechaVenta') {
+    sql += ` ORDER BY V.FECHA_VENTA ${orderDirection}, V.LOCAL_SALE_ID ${orderDirection}`;
+  } else {
+    sql += ` ORDER BY ${sortColumn} ${orderDirection}, V.FECHA_VENTA ${orderDirection}, V.LOCAL_SALE_ID ${orderDirection}`;
+  }
+
+  // Pedir uno más para saber si hay siguiente página
+  sql += ` ROWS 1 TO ${limit + 1}`;
+
+  // Ejecutar query principal
+  const results = await query<IVentaLocalDB>({
+    sql,
+    params,
+    converters: converterVentaLocal,
+  });
+
+  // Determinar si hay más páginas
+  const hasNextPage = results.length > limit;
+  const data = hasNextPage ? results.slice(0, limit) : results;
+
+  // Generar cursores
+  let nextCursor: string | null = null;
+  let previousCursor: string | null = null;
+
+  if (data.length > 0) {
+    // Cursor para siguiente página (último elemento)
+    if (hasNextPage) {
+      const lastRecord = data[data.length - 1];
+      nextCursor = encodeCursor({
+        fechaVenta: moment(lastRecord.FECHA_VENTA).format("YYYY-MM-DD HH:mm:ss.SSS"),
+        localSaleId: lastRecord.LOCAL_SALE_ID,
+        sortValue: getSortValue(lastRecord, sortBy),
+      });
+    }
+
+    // Cursor para página anterior (primer elemento) - solo si hay cursor actual
+    if (cursorData) {
+      const firstRecord = data[0];
+      previousCursor = encodeCursor({
+        fechaVenta: moment(firstRecord.FECHA_VENTA).format("YYYY-MM-DD HH:mm:ss.SSS"),
+        localSaleId: firstRecord.LOCAL_SALE_ID,
+        sortValue: getSortValue(firstRecord, sortBy),
+      });
+    }
+  }
+
+  // Contar total si se solicita
+  let totalCount: number | undefined;
+  if (filtros.includeTotal) {
+    const countParams: any[] = [];
+    let countSql = QUERY_COUNT_VENTAS_LOCALES_BASE;
+    countSql += buildWhereConditions(filtros, countParams);
+
+    const countResult = await query<{ TOTAL: number }>({
+      sql: countSql,
+      params: countParams,
+    });
+    totalCount = countResult[0]?.TOTAL || 0;
+  }
+
+  // Construir filtros aplicados para la respuesta
+  const appliedFilters: Record<string, any> = {};
+  for (const [key, value] of Object.entries(filtros)) {
+    if (value !== undefined && key !== 'cursor' && key !== 'limit' && key !== 'sortBy' && key !== 'sortOrder' && key !== 'includeTotal') {
+      appliedFilters[key] = value;
+    }
+  }
+
+  return {
+    data,
+    pagination: {
+      hasNextPage,
+      hasPreviousPage: !!cursorData,
+      nextCursor,
+      previousCursor,
+      limit,
+      ...(totalCount !== undefined && { totalCount }),
+    },
+    filters: {
+      applied: appliedFilters,
+      sortBy,
+      sortOrder,
+    },
+  };
+};
+
 export default {
   crear: crearVentaLocal,
   actualizar: actualizarVentaLocal,
   listar: obtenerVentasLocales,
+  listarV2: obtenerVentasLocalesV2,
   obtenerPorId: obtenerVentaLocalPorId,
   obtenerProductos: obtenerProductosVentaLocal,
   obtenerCombos: obtenerCombosVentaLocal,

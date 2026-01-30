@@ -8,6 +8,9 @@ import responses from "../../network/responses";
 import {
   IVentaLocalInput,
   IFiltrosVentasLocales,
+  IFiltrosVentasLocalesV2,
+  SortField,
+  SortOrder,
   ErrorVentaLocal,
   TipoErrorVentaLocal,
 } from "./interfaces";
@@ -175,6 +178,156 @@ router.get("/", async (req, res) => {
       req,
       res,
       data: ventas,
+    });
+  } catch (error: any) {
+    return responses.error({
+      req,
+      res,
+      error: "Error al obtener las ventas locales",
+      details: error.message || error,
+    });
+  }
+});
+
+/**
+ * GET /v2 - Listado de ventas locales con paginación por cursor (World Class)
+ *
+ * Query Parameters:
+ * - Filtros de fecha:
+ *   @param {string} fechaInicio - Fecha inicio (YYYY-MM-DD)
+ *   @param {string} fechaFin - Fecha fin (YYYY-MM-DD)
+ *
+ * - Filtros de texto (búsqueda parcial):
+ *   @param {string} nombreCliente - Nombre del cliente
+ *   @param {string} telefono - Teléfono
+ *   @param {string} direccion - Dirección
+ *   @param {string} ciudad - Ciudad
+ *   @param {string} colonia - Colonia
+ *   @param {string} poblacion - Población
+ *
+ * - Filtros exactos:
+ *   @param {number} zonaClienteId - ID de zona cliente
+ *   @param {string} tipoVenta - CONTADO | CREDITO
+ *   @param {string} userEmail - Email del vendedor
+ *   @param {number} almacenId - ID del almacén
+ *   @param {boolean} enviado - Estado de envío
+ *
+ * - Filtros de rango:
+ *   @param {number} precioMin - Precio mínimo
+ *   @param {number} precioMax - Precio máximo
+ *
+ * - Búsqueda general:
+ *   @param {string} search - Busca en múltiples campos
+ *
+ * - Paginación:
+ *   @param {string} cursor - Cursor para paginación
+ *   @param {number} limit - Tamaño de página (default 20, max 100)
+ *
+ * - Ordenamiento:
+ *   @param {string} sortBy - Campo: fechaVenta|nombreCliente|precioTotal|ciudad|tipoVenta
+ *   @param {string} sortOrder - asc|desc (default desc)
+ *
+ * - Opciones:
+ *   @param {boolean} includeTotal - Incluir conteo total (más lento)
+ */
+router.get("/v2", async (req, res) => {
+  try {
+    const {
+      // Filtros de fecha
+      fechaInicio,
+      fechaFin,
+      // Filtros de texto
+      nombreCliente,
+      telefono,
+      direccion,
+      ciudad,
+      colonia,
+      poblacion,
+      // Filtros exactos
+      zonaClienteId,
+      tipoVenta,
+      userEmail,
+      almacenId,
+      enviado,
+      // Filtros de rango
+      precioMin,
+      precioMax,
+      // Búsqueda general
+      search,
+      // Paginación
+      cursor,
+      limit,
+      // Ordenamiento
+      sortBy,
+      sortOrder,
+      // Opciones
+      includeTotal,
+    } = req.query;
+
+    const filtros: IFiltrosVentasLocalesV2 = {};
+
+    // Filtros de fecha
+    if (fechaInicio) filtros.fechaInicio = fechaInicio as string;
+    if (fechaFin) filtros.fechaFin = fechaFin as string;
+
+    // Filtros de texto
+    if (nombreCliente) filtros.nombreCliente = nombreCliente as string;
+    if (telefono) filtros.telefono = telefono as string;
+    if (direccion) filtros.direccion = direccion as string;
+    if (ciudad) filtros.ciudad = ciudad as string;
+    if (colonia) filtros.colonia = colonia as string;
+    if (poblacion) filtros.poblacion = poblacion as string;
+
+    // Filtros exactos
+    if (zonaClienteId) filtros.zonaClienteId = parseInt(zonaClienteId as string);
+    if (tipoVenta) {
+      const tipo = (tipoVenta as string).toUpperCase();
+      if (tipo === 'CONTADO' || tipo === 'CREDITO') {
+        filtros.tipoVenta = tipo;
+      }
+    }
+    if (userEmail) filtros.userEmail = userEmail as string;
+    if (almacenId) filtros.almacenId = parseInt(almacenId as string);
+    if (enviado !== undefined) {
+      filtros.enviado = enviado === 'true' || enviado === '1';
+    }
+
+    // Filtros de rango
+    if (precioMin) filtros.precioMin = parseFloat(precioMin as string);
+    if (precioMax) filtros.precioMax = parseFloat(precioMax as string);
+
+    // Búsqueda general
+    if (search) filtros.search = search as string;
+
+    // Paginación
+    if (cursor) filtros.cursor = cursor as string;
+    if (limit) filtros.limit = parseInt(limit as string);
+
+    // Ordenamiento
+    if (sortBy) {
+      const validSortFields: SortField[] = ['fechaVenta', 'nombreCliente', 'precioTotal', 'ciudad', 'tipoVenta'];
+      if (validSortFields.includes(sortBy as SortField)) {
+        filtros.sortBy = sortBy as SortField;
+      }
+    }
+    if (sortOrder) {
+      const order = (sortOrder as string).toLowerCase();
+      if (order === 'asc' || order === 'desc') {
+        filtros.sortOrder = order as SortOrder;
+      }
+    }
+
+    // Opciones
+    if (includeTotal !== undefined) {
+      filtros.includeTotal = includeTotal === 'true' || includeTotal === '1';
+    }
+
+    const resultado = await controller.listarV2(filtros);
+
+    return responses.success({
+      req,
+      res,
+      data: resultado,
     });
   } catch (error: any) {
     return responses.error({

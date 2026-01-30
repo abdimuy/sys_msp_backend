@@ -2,6 +2,9 @@ import store from './store';
 import {
   IVentaLocalInput,
   IFiltrosVentasLocales,
+  IFiltrosVentasLocalesV2,
+  IPaginatedResponse,
+  IVentaLocalDB,
   ErrorVentaLocal,
   TipoErrorVentaLocal
 } from './interfaces';
@@ -279,6 +282,22 @@ const obtenerVentasLocales = (filtros?: IFiltrosVentasLocales): Promise<any[]> =
   });
 };
 
+/**
+ * Listado de ventas locales V2 con paginación por cursor (World Class)
+ */
+const obtenerVentasLocalesV2 = (
+  filtros?: IFiltrosVentasLocalesV2
+): Promise<IPaginatedResponse<IVentaLocalDB>> => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const resultado = await store.listarV2(filtros || {});
+      resolve(resultado);
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
 const obtenerVentaCompleta = (localSaleId: string): Promise<any> => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -396,6 +415,7 @@ export default {
   crear: crearVentaLocal,
   actualizar: actualizarVentaLocal,
   listar: obtenerVentasLocales,
+  listarV2: obtenerVentasLocalesV2,
   obtenerCompleta: obtenerVentaCompleta,
   eliminar: eliminarVentaLocal,
   obtenerResumen: obtenerResumenVentas,

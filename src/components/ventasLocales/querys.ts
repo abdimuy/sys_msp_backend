@@ -263,3 +263,50 @@ export const QUERY_DELETE_COMBO_POR_ID = `
   DELETE FROM MSP_LOCAL_SALE_COMBO
   WHERE COMBO_ID = ?
 `;
+
+// ===============================================
+// QUERIES PARA PAGINACIÓN POR CURSOR (World Class)
+// ===============================================
+
+// Query base para listado con paginación por cursor
+// Los filtros se agregan dinámicamente
+export const QUERY_GET_VENTAS_LOCALES_V2_BASE = `
+  SELECT
+    V.LOCAL_SALE_ID,
+    V.USER_EMAIL,
+    V.ALMACEN_ID,
+    V.ALMACEN_DESTINO_ID,
+    V.NOMBRE_CLIENTE,
+    V.FECHA_VENTA,
+    V.LATITUD,
+    V.LONGITUD,
+    V.DIRECCION,
+    V.PARCIALIDAD,
+    V.ENGANCHE,
+    V.TELEFONO,
+    V.FREC_PAGO,
+    V.AVAL_O_RESPONSABLE,
+    V.NOTA,
+    V.DIA_COBRANZA,
+    V.PRECIO_TOTAL,
+    V.TIEMPO_A_CORTO_PLAZOMESES,
+    V.MONTO_A_CORTO_PLAZO,
+    V.ENVIADO,
+    V.NUMERO,
+    V.COLONIA,
+    V.POBLACION,
+    V.CIUDAD,
+    V.TIPO_VENTA,
+    V.ZONA_CLIENTE_ID,
+    Z.NOMBRE AS ZONA_CLIENTE
+  FROM MSP_LOCAL_SALE V
+  LEFT JOIN ZONAS_CLIENTES Z ON V.ZONA_CLIENTE_ID = Z.ZONA_CLIENTE_ID
+  WHERE 1=1
+`;
+
+// Query para contar total (opcional, solo cuando se solicita)
+export const QUERY_COUNT_VENTAS_LOCALES_BASE = `
+  SELECT COUNT(*) AS TOTAL
+  FROM MSP_LOCAL_SALE V
+  WHERE 1=1
+`;

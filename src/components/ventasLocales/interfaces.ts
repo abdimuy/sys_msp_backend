@@ -172,6 +172,82 @@ export interface IFiltrosVentasLocales {
   offset?: number;
 }
 
+// ===============================================
+// INTERFACES PARA PAGINACIÓN POR CURSOR (World Class)
+// ===============================================
+
+export type SortField =
+  | 'fechaVenta'
+  | 'nombreCliente'
+  | 'precioTotal'
+  | 'ciudad'
+  | 'tipoVenta';
+
+export type SortOrder = 'asc' | 'desc';
+
+export interface IFiltrosVentasLocalesV2 {
+  // Filtros de fecha
+  fechaInicio?: Date | string;
+  fechaFin?: Date | string;
+
+  // Filtros de texto (búsqueda parcial)
+  nombreCliente?: string;
+  telefono?: string;
+  direccion?: string;
+  ciudad?: string;
+  colonia?: string;
+  poblacion?: string;
+
+  // Filtros exactos
+  zonaClienteId?: number;
+  tipoVenta?: 'CONTADO' | 'CREDITO';
+  userEmail?: string;
+  almacenId?: number;
+  enviado?: boolean;
+
+  // Filtros de rango numérico
+  precioMin?: number;
+  precioMax?: number;
+
+  // Búsqueda general (busca en múltiples campos)
+  search?: string;
+
+  // Paginación por cursor
+  cursor?: string;  // Base64 encoded cursor
+  limit?: number;   // Tamaño de página (default 20, max 100)
+
+  // Ordenamiento
+  sortBy?: SortField;
+  sortOrder?: SortOrder;
+
+  // Opciones adicionales
+  includeTotal?: boolean;  // Si true, incluye el conteo total (más lento)
+}
+
+export interface ICursorData {
+  fechaVenta: string;
+  localSaleId: string;
+  // Campos adicionales para ordenamiento secundario
+  sortValue?: string | number;
+}
+
+export interface IPaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    nextCursor: string | null;
+    previousCursor: string | null;
+    limit: number;
+    totalCount?: number;  // Solo si includeTotal=true
+  };
+  filters: {
+    applied: Record<string, any>;
+    sortBy: SortField;
+    sortOrder: SortOrder;
+  };
+}
+
 export enum TipoErrorVentaLocal {
   ERROR_DUPLICADO = 'ERROR_DUPLICADO',
   ERROR_PARAMETROS = 'ERROR_PARAMETROS',
