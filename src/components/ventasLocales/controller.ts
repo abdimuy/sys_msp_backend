@@ -8,7 +8,7 @@ import {
   ErrorVentaLocal,
   TipoErrorVentaLocal
 } from './interfaces';
-import { obtenerAlmacenDelUsuario } from '../../services/firebaseUserService';
+import { obtenerAlmacenDelUsuario, obtenerUsuariosPorCamioneta } from '../../services/firebaseUserService';
 import { validarStockParaVenta } from '../../services/inventarioService';
 
 /**
@@ -204,6 +204,9 @@ const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
       // Obtener almacén origen
       const almacenOrigenId = await obtenerAlmacenOrigen(datosVenta);
 
+      // Obtener vendedores asignados a la misma camioneta
+      const vendedores = await obtenerUsuariosPorCamioneta(almacenOrigenId);
+
       // Cambiar a true para omitir traspasos por defecto (pruebas)
       const omitirTraspaso = datosVenta.omitirTraspaso ?? false;
 
@@ -225,7 +228,8 @@ const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
         datosVenta,
         almacenOrigenId,
         datosVenta.almacenDestinoId,
-        omitirTraspaso
+        omitirTraspaso,
+        vendedores
       );
       resolve(resultado);
 
@@ -256,12 +260,16 @@ const actualizarVentaLocal = (
       // Obtener almacén origen
       const almacenOrigenId = await obtenerAlmacenOrigen(datosVenta);
 
+      // Obtener vendedores asignados a la misma camioneta
+      const vendedores = await obtenerUsuariosPorCamioneta(almacenOrigenId);
+
       // El store se encarga de validar stock y crear traspasos de ajuste
       const resultado = await store.actualizar(
         localSaleId,
         datosVenta,
         almacenOrigenId,
-        datosVenta.almacenDestinoId
+        datosVenta.almacenDestinoId,
+        vendedores
       );
       resolve(resultado);
 
@@ -383,13 +391,16 @@ const procesarVentasPorLote = (
           // Obtener almacén origen
           const almacenOrigenId = await obtenerAlmacenOrigen(venta);
 
+          // Obtener vendedores asignados a la misma camioneta
+          const vendedoresLote = await obtenerUsuariosPorCamioneta(almacenOrigenId);
+
           // Validar stock disponible en el almacén origen
           const validacionStock = await validarStockParaVenta(almacenOrigenId, venta.productos);
           if (!validacionStock.valido) {
             throw new Error(`Stock insuficiente: ${validacionStock.errores.join(', ')}`);
           }
 
-          await store.crear(venta, almacenOrigenId, venta.almacenDestinoId);
+          await store.crear(venta, almacenOrigenId, venta.almacenDestinoId, false, vendedoresLote);
           resultados.exitosas.push(venta.localSaleId);
         } catch (error) {
           resultados.fallidas.push({
@@ -411,6 +422,17 @@ const procesarVentasPorLote = (
   });
 };
 
+const obtenerVendedoresUnicos = (): Promise<any> => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const vendedores = await store.obtenerVendedoresUnicos();
+      resolve(vendedores);
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
 export default {
   crear: crearVentaLocal,
   actualizar: actualizarVentaLocal,
@@ -420,4 +442,5 @@ export default {
   eliminar: eliminarVentaLocal,
   obtenerResumen: obtenerResumenVentas,
   procesarLote: procesarVentasPorLote,
+  obtenerVendedoresUnicos: obtenerVendedoresUnicos,
 };

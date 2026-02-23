@@ -31,6 +31,10 @@ import {
   QUERY_DELETE_COMBOS_VENTA_LOCAL,
   QUERY_GET_VENTAS_LOCALES_V2_BASE,
   QUERY_COUNT_VENTAS_LOCALES_BASE,
+  QUERY_INSERT_VENDEDOR_VENTA_LOCAL,
+  QUERY_GET_VENDEDORES_VENTA_LOCAL,
+  QUERY_DELETE_VENDEDORES_VENTA_LOCAL,
+  QUERY_GET_VENDEDORES_UNICOS,
 } from "./querys";
 import {
   IVentaLocalInput,
@@ -50,6 +54,7 @@ import {
   IDiferenciaProducto,
   IResultadoComparacionProductos,
   IComboVentaLocalDB,
+  IVendedorVentaLocalDB,
 } from "./interfaces";
 import traspasosStore from "../traspasos/store";
 import traspasosController from "../traspasos/controller";
@@ -82,6 +87,12 @@ const converterCombo: IQueryConverter[] = [
   { type: "buffer", column: "COMBO_ID" },
   { type: "buffer", column: "LOCAL_SALE_ID" },
   { type: "buffer", column: "NOMBRE_COMBO" },
+];
+
+const converterVendedor: IQueryConverter[] = [
+  { type: "buffer", column: "LOCAL_SALE_ID" },
+  { type: "buffer", column: "VENDEDOR_EMAIL" },
+  { type: "buffer", column: "NOMBRE_VENDEDOR" },
 ];
 
 interface ICheckExistsResult {
@@ -174,7 +185,8 @@ const crearVentaLocal = async (
   datosVenta: IVentaLocalInput,
   almacenOrigenId: number,
   almacenDestinoId?: number,
-  omitirTraspaso?: boolean
+  omitirTraspaso?: boolean,
+  vendedores?: { email: string; nombre: string }[]
 ): Promise<any> => {
   const db = await getDbConnectionAsync();
   const transaction = await getDbTransactionAsync(db);
@@ -290,6 +302,17 @@ const crearVentaLocal = async (
       }
     }
 
+    // Guardar vendedores si existen
+    if (vendedores && vendedores.length > 0) {
+      for (const vendedor of vendedores) {
+        await queryAsync(transaction, QUERY_INSERT_VENDEDOR_VENTA_LOCAL, [
+          datosVenta.localSaleId.trim().toUpperCase(),
+          vendedor.email.trim().toLowerCase(),
+          vendedor.nombre,
+        ]);
+      }
+    }
+
     // Crear traspaso automático DENTRO de la misma transacción (si no se omite)
     if (!omitirTraspaso) {
       const datosTraspaso = {
@@ -319,6 +342,7 @@ const crearVentaLocal = async (
         : `Venta local creada exitosamente con ID ${datosVenta.localSaleId}`,
       productosRegistrados: datosVenta.productos.length,
       combosRegistrados: datosVenta.combos?.length || 0,
+      vendedoresRegistrados: vendedores?.length || 0,
       almacenOrigenId,
       almacenDestinoId: almacenDestino,
       traspasoOmitido: omitirTraspaso || false,
@@ -457,7 +481,8 @@ const actualizarVentaLocal = async (
   localSaleId: string,
   datosVenta: IVentaLocalInput,
   almacenOrigenId: number,
-  almacenDestinoId?: number
+  almacenDestinoId?: number,
+  vendedores?: { email: string; nombre: string }[]
 ): Promise<any> => {
   const localSaleIdNormalizado = localSaleId.trim().toUpperCase();
 
@@ -701,6 +726,21 @@ const actualizarVentaLocal = async (
       ]);
     }
 
+    // Actualizar vendedores (eliminar anteriores e insertar nuevos)
+    await queryAsync(transaction, QUERY_DELETE_VENDEDORES_VENTA_LOCAL, [
+      localSaleIdNormalizado,
+    ]);
+
+    if (vendedores && vendedores.length > 0) {
+      for (const vendedor of vendedores) {
+        await queryAsync(transaction, QUERY_INSERT_VENDEDOR_VENTA_LOCAL, [
+          localSaleIdNormalizado,
+          vendedor.email.trim().toLowerCase(),
+          vendedor.nombre,
+        ]);
+      }
+    }
+
     // 11. Commit
     await commitTransactionAsync(transaction);
     await detachDbAsync(db);
@@ -816,6 +856,26 @@ const obtenerCombosVentaLocal = async (
   });
 };
 
+const obtenerVendedoresVentaLocal = async (
+  localSaleId: string
+): Promise<IVendedorVentaLocalDB[]> => {
+  return await query<IVendedorVentaLocalDB>({
+    sql: QUERY_GET_VENDEDORES_VENTA_LOCAL,
+    params: [localSaleId.trim().toUpperCase()],
+    converters: converterVendedor,
+  });
+};
+
+const obtenerVendedoresUnicos = async (): Promise<{ VENDEDOR_EMAIL: string; NOMBRE_VENDEDOR: string }[]> => {
+  return await query<{ VENDEDOR_EMAIL: string; NOMBRE_VENDEDOR: string }>({
+    sql: QUERY_GET_VENDEDORES_UNICOS,
+    converters: [
+      { type: "buffer", column: "VENDEDOR_EMAIL" },
+      { type: "buffer", column: "NOMBRE_VENDEDOR" },
+    ],
+  });
+};
+
 const obtenerVentaCompleta = async (localSaleId: string): Promise<any> => {
   const venta = await obtenerVentaLocalPorId(localSaleId);
 
@@ -830,6 +890,7 @@ const obtenerVentaCompleta = async (localSaleId: string): Promise<any> => {
 
   const productos = await obtenerProductosVentaLocal(localSaleId);
   const combos = await obtenerCombosVentaLocal(localSaleId);
+  const vendedores = await obtenerVendedoresVentaLocal(localSaleId);
 
   // Obtener las imágenes de la venta
   const imagenes = await query({
@@ -848,6 +909,7 @@ const obtenerVentaCompleta = async (localSaleId: string): Promise<any> => {
     ...venta,
     productos,
     combos,
+    vendedores,
     imagenes,
   };
 };
@@ -870,6 +932,10 @@ const eliminarVentaLocal = async (localSaleId: string): Promise<any> => {
         "VENTA_NO_ENCONTRADA"
       );
     }
+
+    await queryAsync(transaction, QUERY_DELETE_VENDEDORES_VENTA_LOCAL, [
+      localSaleId.trim().toUpperCase(),
+    ]);
 
     await queryAsync(transaction, QUERY_DELETE_PRODUCTOS_VENTA_LOCAL, [
       localSaleId.trim().toUpperCase(),
@@ -1049,6 +1115,16 @@ const buildWhereConditions = (
     params.push(filtros.enviado);
   }
 
+  // Filtro por vendedores asignados
+  if (filtros.vendedorEmails && filtros.vendedorEmails.length > 0) {
+    const placeholders = filtros.vendedorEmails.map(() => '?').join(',');
+    conditions.push(`V.LOCAL_SALE_ID IN (
+      SELECT VE.LOCAL_SALE_ID FROM MSP_LOCAL_SALE_VENDEDOR VE
+      WHERE LOWER(VE.VENDEDOR_EMAIL) IN (${placeholders})
+    )`);
+    params.push(...filtros.vendedorEmails.map(e => e.trim().toLowerCase()));
+  }
+
   // Filtros de rango numérico
   if (filtros.precioMin !== undefined) {
     conditions.push("V.PRECIO_TOTAL >= ?");
@@ -1186,7 +1262,37 @@ const obtenerVentasLocalesV2 = async (
 
   // Determinar si hay más páginas
   const hasNextPage = results.length > limit;
-  const data = hasNextPage ? results.slice(0, limit) : results;
+  const dataRaw = hasNextPage ? results.slice(0, limit) : results;
+
+  // Obtener vendedores de todas las ventas de la página en una sola query
+  let dataConVendedores: (IVentaLocalDB & { vendedores: IVendedorVentaLocalDB[] })[] = [];
+  if (dataRaw.length > 0) {
+    const ids = dataRaw.map(v => v.LOCAL_SALE_ID);
+    const placeholders = ids.map(() => '?').join(',');
+    const vendedoresAll = await query<IVendedorVentaLocalDB>({
+      sql: `SELECT LOCAL_SALE_ID, VENDEDOR_EMAIL, NOMBRE_VENDEDOR
+            FROM MSP_LOCAL_SALE_VENDEDOR
+            WHERE LOCAL_SALE_ID IN (${placeholders})
+            ORDER BY NOMBRE_VENDEDOR`,
+      params: ids,
+      converters: converterVendedor,
+    });
+
+    // Agrupar vendedores por LOCAL_SALE_ID
+    const vendedoresMap = new Map<string, IVendedorVentaLocalDB[]>();
+    for (const v of vendedoresAll) {
+      const arr = vendedoresMap.get(v.LOCAL_SALE_ID) || [];
+      arr.push(v);
+      vendedoresMap.set(v.LOCAL_SALE_ID, arr);
+    }
+
+    dataConVendedores = dataRaw.map(venta => ({
+      ...venta,
+      vendedores: vendedoresMap.get(venta.LOCAL_SALE_ID) || [],
+    }));
+  }
+
+  const data = dataConVendedores;
 
   // Generar cursores
   let nextCursor: string | null = null;
@@ -1262,6 +1368,8 @@ export default {
   obtenerPorId: obtenerVentaLocalPorId,
   obtenerProductos: obtenerProductosVentaLocal,
   obtenerCombos: obtenerCombosVentaLocal,
+  obtenerVendedores: obtenerVendedoresVentaLocal,
+  obtenerVendedoresUnicos: obtenerVendedoresUnicos,
   obtenerCompleta: obtenerVentaCompleta,
   eliminar: eliminarVentaLocal,
   obtenerResumen: obtenerResumenVentas,

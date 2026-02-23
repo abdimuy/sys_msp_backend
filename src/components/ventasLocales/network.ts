@@ -252,6 +252,8 @@ router.get("/v2", async (req, res) => {
       // Filtros de rango
       precioMin,
       precioMax,
+      // Filtro por vendedores
+      vendedorEmails,
       // Búsqueda general
       search,
       // Paginación
@@ -296,6 +298,14 @@ router.get("/v2", async (req, res) => {
     if (precioMin) filtros.precioMin = parseFloat(precioMin as string);
     if (precioMax) filtros.precioMax = parseFloat(precioMax as string);
 
+    // Filtro por vendedores (acepta comma-separated o múltiples params)
+    if (vendedorEmails) {
+      const emails = Array.isArray(vendedorEmails)
+        ? vendedorEmails as string[]
+        : (vendedorEmails as string).split(',').map(e => e.trim()).filter(Boolean);
+      if (emails.length > 0) filtros.vendedorEmails = emails;
+    }
+
     // Búsqueda general
     if (search) filtros.search = search as string;
 
@@ -334,6 +344,25 @@ router.get("/v2", async (req, res) => {
       req,
       res,
       error: "Error al obtener las ventas locales",
+      details: error.message || error,
+    });
+  }
+});
+
+router.get("/vendedores", async (req, res) => {
+  try {
+    const vendedores = await controller.obtenerVendedoresUnicos();
+
+    return responses.success({
+      req,
+      res,
+      data: vendedores,
+    });
+  } catch (error: any) {
+    return responses.error({
+      req,
+      res,
+      error: "Error al obtener los vendedores",
       details: error.message || error,
     });
   }

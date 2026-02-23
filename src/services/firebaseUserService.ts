@@ -51,7 +51,29 @@ export const obtenerInfoUsuario = async (userEmail: string): Promise<IFirebaseUs
   }
 };
 
+export const obtenerUsuariosPorCamioneta = async (almacenId: number): Promise<{ email: string; nombre: string }[]> => {
+  try {
+    const usersCollection = db.collection('users');
+    const querySnapshot = await usersCollection.where('CAMIONETA_ASIGNADA', '==', almacenId).get();
+
+    if (querySnapshot.empty) {
+      return [];
+    }
+
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data() as IFirebaseUser;
+      return {
+        email: data.EMAIL,
+        nombre: data.NOMBRE,
+      };
+    });
+  } catch (error) {
+    throw new Error(`Error al obtener usuarios por camioneta: ${error instanceof Error ? error.message : error}`);
+  }
+};
+
 export default {
   obtenerAlmacenDelUsuario,
-  obtenerInfoUsuario
+  obtenerInfoUsuario,
+  obtenerUsuariosPorCamioneta
 };

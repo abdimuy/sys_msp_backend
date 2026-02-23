@@ -60,6 +60,12 @@ export interface IComboVentaLocalDB {
   PRECIO_CONTADO: number;
 }
 
+export interface IVendedorVentaLocalDB {
+  LOCAL_SALE_ID: string;
+  VENDEDOR_EMAIL: string;
+  NOMBRE_VENDEDOR: string;
+}
+
 export interface IVentaLocalDB {
   LOCAL_SALE_ID: string;
   USER_EMAIL: string;
@@ -208,6 +214,9 @@ export interface IFiltrosVentasLocalesV2 {
   // Filtros de rango numérico
   precioMin?: number;
   precioMax?: number;
+
+  // Filtro por vendedores asignados (lista de emails)
+  vendedorEmails?: string[];
 
   // Búsqueda general (busca en múltiples campos)
   search?: string;
