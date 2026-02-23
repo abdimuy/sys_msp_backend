@@ -1,8 +1,25 @@
 import express from "express";
+import compression from "compression";
 import controller from "./controller";
 import responses from "../../network/responses";
 
 const router = express.Router();
+
+router.get("/", compression(), (req, res) => {
+  controller
+    .getAllClientes()
+    .then((clientes) => {
+      responses.success({ req, res, data: clientes });
+    })
+    .catch((err) => {
+      responses.error({
+        req,
+        res,
+        error: "Error al obtener los clientes",
+        details: err,
+      });
+    });
+});
 
 router.get("/search", (req, res) => {
   const { text = "" } = req.query;

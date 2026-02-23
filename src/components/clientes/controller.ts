@@ -33,8 +33,13 @@ const getClientesByRuta = (rutaId: number) => {
   });
 };
 
+const getAllClientes = () => {
+  return store.getAllClientes();
+};
+
 export default {
   getClienteById,
   getClienteByText,
   getClientesByRuta,
+  getAllClientes,
 };
