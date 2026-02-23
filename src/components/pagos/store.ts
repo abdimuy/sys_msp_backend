@@ -287,7 +287,6 @@ async function syncChangesToMongo() {
       return;
     }
     
-    console.log(`\nSincronizando ${changes.length} cambios...`);
     const startTime = Date.now();
 
     const db = await connectToMongo();
@@ -299,29 +298,35 @@ async function syncChangesToMongo() {
 
     for (const change of changes) {
       const { TABLE_NAME, RECORD_ID, LOG_ID, OPERATION, CHANGE_TIMESTAMP } = change;
-      
+
       if (!changesByTable.has(TABLE_NAME)) {
         changesByTable.set(TABLE_NAME, {
           records: new Map(),
           logIds: []
         });
       }
-      
+
       const tableData = changesByTable.get(TABLE_NAME)!;
       const recordKey = `${RECORD_ID}_${OPERATION}`;
-      
-      if (!tableData.records.has(recordKey) || 
+
+      if (!tableData.records.has(recordKey) ||
           new Date(CHANGE_TIMESTAMP) > new Date(tableData.records.get(recordKey).CHANGE_TIMESTAMP)) {
         tableData.records.set(recordKey, change);
       }
-      
+
       tableData.logIds.push(LOG_ID);
     }
+
+    let totalInsertados = 0;
+    let totalActualizados = 0;
+    let totalEliminados = 0;
+    let totalYaSincronizados = 0;
+    let totalErrores = 0;
 
     for (const [TABLE_NAME, tableData] of changesByTable.entries()) {
       const collectionName = TABLE_NAME.toLowerCase();
       const collection = db.collection(collectionName);
-      
+
       const idFieldNames: { [key: string]: string } = {
         doctos_cc: 'DOCTO_CC_ID',
         importes_doctos_cc: 'IMPTE_DOCTO_CC_ID',
@@ -336,8 +341,8 @@ async function syncChangesToMongo() {
       const operations = Array.from(tableData.records.values());
 
       for (const op of operations) {
-        const recordId = ['msp_pagos_recibidos'].includes(collectionName) 
-          ? op.RECORD_ID 
+        const recordId = ['msp_pagos_recibidos'].includes(collectionName)
+          ? op.RECORD_ID
           : Number(op.RECORD_ID);
 
         if (op.OPERATION === 'DELETE') {
@@ -352,24 +357,18 @@ async function syncChangesToMongo() {
           const result = await collection.deleteMany({
             [idFieldName]: { $in: deleteOps }
           });
-          if (result.deletedCount > 0) {
-            console.log(`${collectionName}: ${result.deletedCount} eliminados`);
-          }
+          totalEliminados += result.deletedCount;
         } catch (error) {
+          totalErrores++;
           console.error(`Error al eliminar registros de ${collectionName}:`, error);
         }
       }
 
       const BATCH_SIZE = 100;
-      let totalProcessed = 0;
-      const totalToProcess = upsertRecordIds.length;
-      
+
       for (let i = 0; i < upsertRecordIds.length; i += BATCH_SIZE) {
         const batchIds = upsertRecordIds.slice(i, i + BATCH_SIZE);
         const bulkOps: any[] = [];
-        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
-        const totalBatches = Math.ceil(totalToProcess / BATCH_SIZE);
-        
 
         for (const recordId of batchIds) {
           try {
@@ -384,6 +383,7 @@ async function syncChangesToMongo() {
               });
             }
           } catch (error) {
+            totalErrores++;
             console.error(`Error al obtener registro ${TABLE_NAME} ID: ${recordId}`, error);
           }
         }
@@ -391,43 +391,14 @@ async function syncChangesToMongo() {
         if (bulkOps.length > 0) {
           try {
             const result = await collection.bulkWrite(bulkOps, { ordered: false });
-            totalProcessed += result.upsertedCount + result.modifiedCount;
-            if (batchNumber === totalBatches || result.upsertedCount > 0) {
-              console.log(
-                `${collectionName}: Lote ${batchNumber}/${totalBatches} - ` +
-                `${result.upsertedCount} insertados, ${result.modifiedCount} actualizados`
-              );
-            }
+            totalInsertados += result.upsertedCount;
+            totalActualizados += result.modifiedCount;
+            totalYaSincronizados += bulkOps.length - result.upsertedCount - result.modifiedCount;
           } catch (bulkError: any) {
-            if (bulkError.code === 11000) {
-              console.error(`${collectionName}: Error de clave duplicada en batch`);
-            } else if (bulkError.writeErrors && bulkError.writeErrors.length > 0) {
-              console.error(`${collectionName}: ${bulkError.writeErrors.length} errores en batch`);
-              bulkError.writeErrors.slice(0, 5).forEach((err: any) => {
-                console.error(`Error en documento: ${JSON.stringify(err)}`);
-              });
-            } else {
-              console.error(`${collectionName}: Error en batch:`, bulkError.message || bulkError);
-            }
-            
-            if (bulkError.result) {
-              const { nInserted = 0, nUpserted = 0, nModified = 0 } = bulkError.result;
-              const successCount = nInserted + nUpserted + nModified;
-              totalProcessed += successCount;
-              if (successCount > 0) {
-                console.log(
-                  `${collectionName}: Lote ${batchNumber}/${totalBatches} con errores - ` +
-                  `${successCount} procesados`
-                );
-              }
-            }
+            totalErrores++;
+            console.error(`${collectionName}: Error en bulk:`, bulkError.message || bulkError);
           }
         }
-      }
-      
-      // Resumen final para esta tabla
-      if (totalProcessed > 0) {
-        console.log(`${collectionName}: ${totalProcessed} registros procesados`);
       }
 
       const MARK_BATCH_SIZE = 200;
@@ -437,9 +408,15 @@ async function syncChangesToMongo() {
       }
     }
 
-    const endTime = Date.now();
-    const duration = endTime - startTime;
-    console.log(`Sincronización completada en ${(duration / 1000).toFixed(1)}s`);
+    const duration = Date.now() - startTime;
+    const partes: string[] = [];
+    if (totalInsertados > 0) partes.push(`${totalInsertados} insertados`);
+    if (totalActualizados > 0) partes.push(`${totalActualizados} actualizados`);
+    if (totalEliminados > 0) partes.push(`${totalEliminados} eliminados`);
+    if (totalYaSincronizados > 0) partes.push(`${totalYaSincronizados} ya sincronizados`);
+    if (totalErrores > 0) partes.push(`${totalErrores} errores`);
+    const resumen = partes.length > 0 ? partes.join(', ') : 'sin cambios nuevos';
+    console.log(`Sync ciclo: ${changes.length} cambios procesados → ${resumen} (${(duration / 1000).toFixed(1)}s)`);
   } catch (error) {
     console.error('Error en la sincronización:', error);
   } finally {
@@ -460,9 +437,41 @@ async function markChangesAsProcessedBatch(logIds: number[]): Promise<any> {
   });
 }
 
+async function syncPagoInmediato(doctoCCId: number, mspPagoId: string): Promise<number> {
+  const startTime = Date.now();
+  const db = await connectToMongo();
+
+  const tasks = [
+    { table: 'DOCTOS_CC', collection: 'doctos_cc', sql: 'SELECT * FROM DOCTOS_CC WHERE DOCTO_CC_ID = ?', param: doctoCCId, converter: doctosCcConverters, idField: 'DOCTO_CC_ID' },
+    { table: 'IMPORTES_DOCTOS_CC', collection: 'importes_doctos_cc', sql: 'SELECT * FROM IMPORTES_DOCTOS_CC WHERE DOCTO_CC_ID = ?', param: doctoCCId, converter: importesDoctosCcConverters, idField: 'IMPTE_DOCTO_CC_ID' },
+    { table: 'FORMAS_COBRO_DOCTOS', collection: 'formas_cobro_doctos', sql: 'SELECT * FROM FORMAS_COBRO_DOCTOS WHERE DOCTO_ID = ?', param: doctoCCId, converter: formasCobroDoctos, idField: 'FORMA_COBRO_DOC_ID' },
+    { table: 'MSP_PAGOS_RECIBIDOS', collection: 'msp_pagos_recibidos', sql: 'SELECT * FROM MSP_PAGOS_RECIBIDOS WHERE ID = ?', param: mspPagoId, converter: mspPagosRecibidos, idField: 'ID' },
+  ];
+
+  const results = await Promise.allSettled(
+    tasks.map(async (t) => {
+      const records: any[] = await query({ sql: t.sql, params: [t.param], converters: t.converter });
+      if (!records || records.length === 0) return;
+      const collection = db.collection(t.collection);
+      const bulkOps = records.map((rec) => ({
+        updateOne: { filter: { [t.idField]: rec[t.idField] }, update: { $set: rec }, upsert: true }
+      }));
+      await collection.bulkWrite(bulkOps, { ordered: false });
+    })
+  );
+
+  const duration = Date.now() - startTime;
+  const failed = results.filter(r => r.status === 'rejected');
+  if (failed.length > 0) {
+    console.warn(`syncPagoInmediato: ${failed.length}/4 tablas fallaron (${duration}ms)`);
+  }
+  return duration;
+}
+
 export default {
     existUniqueIdPago,
     getPagosByVentaId,
     getPagosByVentaIdsMongo,
-    syncChangesToMongo
+    syncChangesToMongo,
+    syncPagoInmediato
 }

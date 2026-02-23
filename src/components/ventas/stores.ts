@@ -545,7 +545,7 @@ const insertDataToFirebird = async (
       });
     });
     db.detach();
-    return folio;
+    return { folio, doctoCCId: idDoctoCCID };
   } catch (error) {
     // En caso de error, se hace rollback y se cierra la conexión
     await new Promise<void>((resolve) => {

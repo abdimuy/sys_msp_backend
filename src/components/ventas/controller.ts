@@ -343,7 +343,12 @@ const addPago = (pago: PagoDto) => {
       DOCTO_CC_ACR_ID,
       FORMA_COBRO_ID,
       ID_TO_USE
-    ).then(res => {
+    ).then((result: any) => {
+      // Sync inmediato a MongoDB (fire-and-forget)
+      pagosStore.syncPagoInmediato(result.doctoCCId, ID_TO_USE)
+        .then((ms) => console.log(`Sync inmediato OK - Pago ${ID_TO_USE} (${ms}ms)`))
+        .catch(err => console.warn(`Sync inmediato FALLÓ - Pago ${ID_TO_USE}:`, err));
+
       fs.appendFileSync("./data", `Pago con ID ${pago.ID} insertado con exito\n`, 'utf-8');
       pagosStore.existUniqueIdPago(ID_TO_USE).then(res => {
         if (res) {
