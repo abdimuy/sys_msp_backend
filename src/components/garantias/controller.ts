@@ -20,10 +20,21 @@ const getGarantiasActivas = async (): Promise<GarantiaRow[]> => {
 const addGarantia = async (
   data: CreateGarantiaRequest
 ): Promise<GarantiaRow> => {
-  const { doctoCcId, descripcionFalla } = data;
-  if (!Number.isInteger(doctoCcId) || doctoCcId <= 0) {
-    throw new Error("ID de documento inválido");
+  const { doctoCcId, descripcionFalla, nombreCliente, nombreProducto } = data;
+
+  if (doctoCcId != null) {
+    if (!Number.isInteger(doctoCcId) || doctoCcId <= 0) {
+      throw new Error("ID de documento inválido");
+    }
+  } else {
+    if (!nombreCliente || nombreCliente.trim() === "") {
+      throw new Error("nombreCliente es obligatorio cuando no hay venta asociada");
+    }
+    if (!nombreProducto || nombreProducto.trim() === "") {
+      throw new Error("nombreProducto es obligatorio cuando no hay venta asociada");
+    }
   }
+
   if (!descripcionFalla || descripcionFalla.trim() === "") {
     throw new Error("Descripción de falla es obligatoria");
   }
@@ -65,15 +76,33 @@ export async function uploadGarantiaImages(
 }
 
 export async function createGarantiaWithImages(req: Request, res: Response) {
-  const garantiaIdParam = Number(req.params.id);
-  if (!Number.isInteger(garantiaIdParam) || garantiaIdParam <= 0) {
-    return res.status(400).json({ error: "ID de garantía inválido" });
-  }
-
   // Multer dejó los ficheros en disco en req.files
   const files = req.files as Express.Multer.File[] | undefined;
   if (!files || files.length === 0) {
     return res.status(400).json({ error: "No se recibieron imágenes" });
+  }
+
+  // doctoCcId ahora viene del body y es opcional
+  const doctoCcIdRaw = req.body.doctoCcId;
+  let doctoCcId: number | null = null;
+  if (doctoCcIdRaw != null && doctoCcIdRaw !== "") {
+    doctoCcId = Number(doctoCcIdRaw);
+    if (!Number.isInteger(doctoCcId) || doctoCcId <= 0) {
+      return res.status(400).json({ error: "doctoCcId inválido" });
+    }
+  }
+
+  const nombreCliente = req.body.nombreCliente ? String(req.body.nombreCliente) : null;
+  const nombreProducto = req.body.nombreProducto ? String(req.body.nombreProducto) : null;
+
+  // Si no hay venta, exigir nombre cliente y producto
+  if (doctoCcId == null) {
+    if (!nombreCliente || nombreCliente.trim() === "") {
+      return res.status(400).json({ error: "nombreCliente es obligatorio cuando no hay venta asociada" });
+    }
+    if (!nombreProducto || nombreProducto.trim() === "") {
+      return res.status(400).json({ error: "nombreProducto es obligatorio cuando no hay venta asociada" });
+    }
   }
 
   // Datos extra que envías en el body (pueden venir en multipart)
@@ -98,12 +127,14 @@ export async function createGarantiaWithImages(req: Request, res: Response) {
 
   try {
     const newGarantiaId = await addGarantiaWithImages(
-      garantiaIdParam,
+      doctoCcId,
       descripcionFalla,
       observaciones,
       filesOnDisk,
       imagesMetadata,
-      externalId
+      externalId,
+      nombreCliente,
+      nombreProducto
     );
     return res.status(201).json({ id: newGarantiaId });
   } catch (error: any) {

@@ -16,18 +16,25 @@ export interface UploadedFile {
 
 export interface GarantiaRow {
   ID: number;
-  DOCTO_CC_ID: number;
+  DOCTO_CC_ID: number | null;
   FECHA_SOLICITUD: string;
   DESCRIPCION_FALLA: string;
   ESTADO: string;
   FECHA_ULT_ACT: string;
   OBSERVACIONES: string | null;
+  EXTERNAL_ID: string | null;
+  NOMBRE_CLIENTE: string | null;
+  NOMBRE_PRODUCTO: string | null;
+  ZONA_CLIENTE_ID: number | null;
+  ZONA_CLIENTE_NOMBRE: string | null;
 }
 
 export interface CreateGarantiaRequest {
-  doctoCcId: number;
+  doctoCcId?: number | null;
   descripcionFalla: string;
   observaciones?: string;
+  nombreCliente?: string;
+  nombreProducto?: string;
 }
 
 export interface CreateImagenGarantiaRequest {

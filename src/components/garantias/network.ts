@@ -18,8 +18,8 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const name = `garantia-${req.params.id}-${file.originalname}`;
+    const idPart = req.params.id || "nueva";
+    const name = `garantia-${idPart}-${Date.now()}-${file.originalname}`;
     cb(null, name);
   },
 });
@@ -66,7 +66,14 @@ router.get("/:idGarantia", controller.getGarantiaById)
 
 router.get('/eventos_activos', controller.getEventosGarantiasActivas)
 
-// Ruta: POST /garantias/:id/imagenes
+// Ruta: POST /garantias/nueva — crear garantía (con o sin venta asociada)
+router.post(
+  "/nueva",
+  upload.array("imagenes", 10),
+  createGarantiaWithImages
+);
+
+// Ruta legacy: POST /garantias/:id/imagenes (mantiene compatibilidad)
 router.post(
   "/:id/imagenes",
   upload.array("imagenes", 10),

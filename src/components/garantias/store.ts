@@ -22,12 +22,14 @@ import path from "path";
 
 async function getGarantiasActivas(): Promise<GarantiaRow[]> {
   const sql = `
-  SELECT ID, MSP_GARANTIAS.DOCTO_CC_ID, FECHA_SOLICITUD, DESCRIPCION_FALLA,
-    ESTADO, FECHA_ULT_ACT, OBSERVACIONES, EXTERNAL_ID, ZONAS_CLIENTES.ZONA_CLIENTE_ID, ZONAS_CLIENTES.NOMBRE AS ZONA_CLIENTE_NOMBRE
+  SELECT MSP_GARANTIAS.ID, MSP_GARANTIAS.DOCTO_CC_ID, FECHA_SOLICITUD, DESCRIPCION_FALLA,
+    ESTADO, FECHA_ULT_ACT, OBSERVACIONES, EXTERNAL_ID,
+    MSP_GARANTIAS.NOMBRE_CLIENTE, MSP_GARANTIAS.NOMBRE_PRODUCTO,
+    ZONAS_CLIENTES.ZONA_CLIENTE_ID, ZONAS_CLIENTES.NOMBRE AS ZONA_CLIENTE_NOMBRE
   FROM MSP_GARANTIAS
-  INNER JOIN DOCTOS_CC ON DOCTOS_CC.DOCTO_CC_ID = MSP_GARANTIAS.DOCTO_CC_ID
-  INNER JOIN CLIENTES ON CLIENTES.CLIENTE_ID = DOCTOS_CC.CLIENTE_ID
-  INNER JOIN ZONAS_CLIENTES ON ZONAS_CLIENTES.ZONA_CLIENTE_ID = CLIENTES.ZONA_CLIENTE_ID
+  LEFT JOIN DOCTOS_CC ON DOCTOS_CC.DOCTO_CC_ID = MSP_GARANTIAS.DOCTO_CC_ID
+  LEFT JOIN CLIENTES ON CLIENTES.CLIENTE_ID = DOCTOS_CC.CLIENTE_ID
+  LEFT JOIN ZONAS_CLIENTES ON ZONAS_CLIENTES.ZONA_CLIENTE_ID = CLIENTES.ZONA_CLIENTE_ID
   WHERE ESTADO != 'CANCELADO' AND ESTADO != 'CIERRE_GARANTIA'
   `;
 
@@ -40,7 +42,8 @@ async function getGarantiasActivas(): Promise<GarantiaRow[]> {
 async function getGarantiaById(idGarantia: number): Promise<GarantiaRow> {
   const sql = `
     SELECT ID, DOCTO_CC_ID, FECHA_SOLICITUD, DESCRIPCION_FALLA,
-      ESTADO, FECHA_ULT_ACT, OBSERVACIONES, EXTERNAL_ID
+      ESTADO, FECHA_ULT_ACT, OBSERVACIONES, EXTERNAL_ID,
+      NOMBRE_CLIENTE, NOMBRE_PRODUCTO
     FROM MSP_GARANTIAS
     WHERE ID = ?
   `
@@ -118,18 +121,21 @@ export async function addGarantia(
 ): Promise<GarantiaRow> {
   const sql = `
     INSERT INTO MSP_GARANTIAS
-      (DOCTO_CC_ID, DESCRIPCION_FALLA, OBSERVACIONES)
+      (DOCTO_CC_ID, DESCRIPCION_FALLA, OBSERVACIONES, NOMBRE_CLIENTE, NOMBRE_PRODUCTO)
     VALUES
-      (?, ?, ?)
+      (?, ?, ?, ?, ?)
     RETURNING
-      ID, DOCTO_CC_ID, 
+      ID, DOCTO_CC_ID,
       FECHA_SOLICITUD, DESCRIPCION_FALLA,
-      ESTADO, FECHA_ULT_ACT, OBSERVACIONES
+      ESTADO, FECHA_ULT_ACT, OBSERVACIONES,
+      NOMBRE_CLIENTE, NOMBRE_PRODUCTO
   `;
   const params = [
-    data.doctoCcId,
+    data.doctoCcId ?? null,
     data.descripcionFalla,
     data.observaciones ?? null,
+    data.nombreCliente ?? null,
+    data.nombreProducto ?? null,
   ];
 
   const row: any = await query<GarantiaRow>({ sql, params });
@@ -143,14 +149,14 @@ export interface FileWithPath {
 }
 
 export async function addGarantiaWithImages(
-  doctoCcId: number,
+  doctoCcId: number | null,
   descripcionFalla: string,
   observaciones: string | null,
-  // aquí pasas los archivos que Multer ya guardó en disco:
   filesOnDisk: FileWithPath[],
-  // y además la metadata que guardarás en GARANTIA_IMAGENES
   imagesMetadata: Omit<CreateImagenGarantiaRequest, "imgPath">[],
-  externalId: string
+  externalId: string,
+  nombreCliente?: string | null,
+  nombreProducto?: string | null
 ): Promise<number> {
   let db: Firebird.Database | null = null;
   let tr: Firebird.Transaction | null = null;
@@ -178,8 +184,8 @@ export async function addGarantiaWithImages(
     // 2. Inserta la garantía
     const insertGarantiaSql = `
       INSERT INTO MSP_GARANTIAS
-        (DOCTO_CC_ID, DESCRIPCION_FALLA, OBSERVACIONES, FECHA_SOLICITUD, ESTADO, EXTERNAL_ID)
-      VALUES (?, ?, ?, ?, ?, ?)
+        (DOCTO_CC_ID, DESCRIPCION_FALLA, OBSERVACIONES, FECHA_SOLICITUD, ESTADO, EXTERNAL_ID, NOMBRE_CLIENTE, NOMBRE_PRODUCTO)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING ID
     `;
     const garantiaRes: any = await queryAsync(tr, insertGarantiaSql, [
@@ -189,6 +195,8 @@ export async function addGarantiaWithImages(
       moment().format("YYYY-MM-DD HH:mm:ss"),
       "PENDIENTE",
       externalId,
+      nombreCliente ?? null,
+      nombreProducto ?? null,
     ]);
     const garantiaId: number = garantiaRes.ID;
 
