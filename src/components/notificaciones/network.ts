@@ -73,19 +73,17 @@ router.put("/zonas", async (req: Request, res: Response) => {
 });
 
 router.post("/test", (req: Request, res: Response) => {
-  const zonaClienteId = req.body.zonaClienteId ?? null;
-  const nombreCliente = req.body.nombreCliente ?? "CLIENTE DE PRUEBA";
   eventBus.emitVentaCreada({
-    localSaleId: "TEST-" + Date.now(),
-    nombreCliente,
-    precioTotal: 9999.99,
-    tipoVenta: "CONTADO",
-    userEmail: "test@prueba.com",
-    productos: 3,
-    zonaClienteId,
+    localSaleId: req.body.localSaleId ?? "TEST-" + Date.now(),
+    nombreCliente: req.body.nombreCliente ?? "CLIENTE DE PRUEBA",
+    precioTotal: req.body.precioTotal ?? 9999.99,
+    tipoVenta: req.body.tipoVenta ?? "CONTADO",
+    userEmail: req.body.userEmail ?? "test@prueba.com",
+    productos: req.body.productos ?? 3,
+    zonaClienteId: req.body.zonaClienteId ?? null,
     timestamp: new Date().toISOString(),
   });
-  res.json({ ok: true, message: "Evento de prueba emitido", zonaClienteId });
+  res.json({ ok: true, message: "Evento de prueba emitido" });
 });
 
 export default router;

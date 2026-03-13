@@ -1065,7 +1065,7 @@ const buildWhereConditions = (
   }
 
   if (filtros.telefono) {
-    conditions.push("V.TELEFONO LIKE ?");
+    conditions.push("CAST(V.TELEFONO AS VARCHAR(200)) LIKE ?");
     params.push(`%${filtros.telefono}%`);
   }
 
@@ -1141,11 +1141,11 @@ const buildWhereConditions = (
     const searchTerm = `%${filtros.search}%`;
     conditions.push(`(
       UPPER(V.NOMBRE_CLIENTE) LIKE UPPER(?) OR
-      V.TELEFONO LIKE ? OR
+      UPPER(CAST(V.TELEFONO AS VARCHAR(200))) LIKE UPPER(?) OR
       UPPER(V.DIRECCION) LIKE UPPER(?) OR
       UPPER(V.CIUDAD) LIKE UPPER(?) OR
       UPPER(V.COLONIA) LIKE UPPER(?) OR
-      V.LOCAL_SALE_ID LIKE UPPER(?)
+      UPPER(CAST(V.LOCAL_SALE_ID AS VARCHAR(200))) LIKE UPPER(?)
     )`);
     params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
   }
