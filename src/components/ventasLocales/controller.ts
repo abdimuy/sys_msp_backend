@@ -10,6 +10,7 @@ import {
 } from './interfaces';
 import { obtenerAlmacenDelUsuario, obtenerUsuariosPorCamioneta } from '../../services/firebaseUserService';
 import { validarStockParaVenta } from '../../services/inventarioService';
+import { eventBus } from '../../utils/eventBus';
 
 /**
  * Valida los campos básicos de una venta local
@@ -231,6 +232,20 @@ const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
         omitirTraspaso,
         vendedores
       );
+
+      if (!resultado.yaExistia) {
+        eventBus.emitVentaCreada({
+          localSaleId: datosVenta.localSaleId,
+          nombreCliente: datosVenta.nombreCliente,
+          precioTotal: datosVenta.productos.reduce((sum, p) => sum + (p.precioLista * p.cantidad), 0),
+          tipoVenta: datosVenta.tipoVenta || "CONTADO",
+          userEmail: datosVenta.userEmail,
+          productos: datosVenta.productos.length,
+          zonaClienteId: datosVenta.zonaClienteId || null,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       resolve(resultado);
 
     } catch (error) {

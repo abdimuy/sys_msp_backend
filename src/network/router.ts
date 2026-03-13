@@ -17,6 +17,7 @@ import sincronizarAMongo from "../components/sincronizarAMongo/network";
 import garantias from "../components/garantias/network";
 import traspasos from "../components/traspasos/network";
 import ventasLocales from "../components/ventasLocales/network";
+import notificaciones from "../components/notificaciones/network";
 
 const appRouter = (server: Express) => {
   server.use("/garantias", garantias);
@@ -37,6 +38,7 @@ const appRouter = (server: Express) => {
   server.use("/visitas", visitas);
   server.use("/pagos", pagos);
   server.use("/sync", sincronizarAMongo);
+  server.use("/notificaciones", notificaciones);
 };
 
 export default appRouter;

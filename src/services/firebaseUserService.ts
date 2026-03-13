@@ -72,8 +72,41 @@ export const obtenerUsuariosPorCamioneta = async (almacenId: number): Promise<{ 
   }
 };
 
+export const obtenerZonasDesktop = async (email: string): Promise<number[]> => {
+  try {
+    const usersCollection = db.collection('users');
+    const querySnapshot = await usersCollection.where('EMAIL', '==', email).get();
+
+    if (querySnapshot.empty) {
+      return [];
+    }
+
+    const userData = querySnapshot.docs[0].data();
+    return Array.isArray(userData.ZONAS_PERMITIDAS_DESKTOP)
+      ? userData.ZONAS_PERMITIDAS_DESKTOP
+      : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+export const asignarZonasDesktop = async (email: string, zonas: number[]): Promise<void> => {
+  const usersCollection = db.collection('users');
+  const querySnapshot = await usersCollection.where('EMAIL', '==', email).get();
+
+  if (querySnapshot.empty) {
+    throw new Error(`Usuario con email ${email} no encontrado`);
+  }
+
+  await querySnapshot.docs[0].ref.update({
+    ZONAS_PERMITIDAS_DESKTOP: zonas,
+  });
+};
+
 export default {
   obtenerAlmacenDelUsuario,
   obtenerInfoUsuario,
-  obtenerUsuariosPorCamioneta
+  obtenerUsuariosPorCamioneta,
+  obtenerZonasDesktop,
+  asignarZonasDesktop
 };
