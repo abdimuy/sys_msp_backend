@@ -68,11 +68,17 @@ const getClientesByRuta = (rutaId: number) => {
 
 let cachedClientes: any[] | null = null;
 let cacheTimestamp = 0;
-const CACHE_TTL = 60 * 60 * 1000; // 1 hora
+const CACHE_TTL_DIA = 30 * 60 * 1000; // 30 min (8am-8pm)
+const CACHE_TTL_NOCHE = 12 * 60 * 60 * 1000; // 12 horas (fuera de horario)
+
+const getCacheTTL = (): number => {
+  const hora = new Date().getHours();
+  return hora >= 8 && hora < 20 ? CACHE_TTL_DIA : CACHE_TTL_NOCHE;
+};
 
 const getAllClientes = async (): Promise<any[]> => {
   const now = Date.now();
-  if (cachedClientes && now - cacheTimestamp < CACHE_TTL) {
+  if (cachedClientes && now - cacheTimestamp < getCacheTTL()) {
     return cachedClientes;
   }
   const clientes = await query({ sql: QUERY_GET_ALL_CLIENTES });

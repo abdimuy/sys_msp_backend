@@ -240,6 +240,7 @@ const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
           precioTotal: datosVenta.productos.reduce((sum, p) => sum + (p.precioLista * p.cantidad), 0),
           tipoVenta: datosVenta.tipoVenta || "CONTADO",
           userEmail: datosVenta.userEmail,
+          vendedoresEmails: vendedores?.map(v => v.email) || [],
           productos: datosVenta.productos.length,
           zonaClienteId: datosVenta.zonaClienteId || null,
           timestamp: new Date().toISOString(),

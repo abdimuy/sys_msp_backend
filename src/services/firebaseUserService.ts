@@ -72,7 +72,7 @@ export const obtenerUsuariosPorCamioneta = async (almacenId: number): Promise<{ 
   }
 };
 
-export const obtenerZonasDesktop = async (email: string): Promise<number[]> => {
+export const obtenerVendedoresDesktop = async (email: string): Promise<string[]> => {
   try {
     const usersCollection = db.collection('users');
     const querySnapshot = await usersCollection.where('EMAIL', '==', email).get();
@@ -82,15 +82,15 @@ export const obtenerZonasDesktop = async (email: string): Promise<number[]> => {
     }
 
     const userData = querySnapshot.docs[0].data();
-    return Array.isArray(userData.ZONAS_PERMITIDAS_DESKTOP)
-      ? userData.ZONAS_PERMITIDAS_DESKTOP
+    return Array.isArray(userData.VENDEDORES_PERMITIDOS_DESKTOP)
+      ? userData.VENDEDORES_PERMITIDOS_DESKTOP
       : [];
   } catch (error) {
     return [];
   }
 };
 
-export const asignarZonasDesktop = async (email: string, zonas: number[]): Promise<void> => {
+export const asignarVendedoresDesktop = async (email: string, vendedores: string[]): Promise<void> => {
   const usersCollection = db.collection('users');
   const querySnapshot = await usersCollection.where('EMAIL', '==', email).get();
 
@@ -99,7 +99,21 @@ export const asignarZonasDesktop = async (email: string, zonas: number[]): Promi
   }
 
   await querySnapshot.docs[0].ref.update({
-    ZONAS_PERMITIDAS_DESKTOP: zonas,
+    VENDEDORES_PERMITIDOS_DESKTOP: vendedores,
+  });
+};
+
+export const obtenerTodosLosUsuarios = async (): Promise<{ email: string; nombre: string; zonaClienteId: number | null }[]> => {
+  const usersCollection = db.collection('users');
+  const querySnapshot = await usersCollection.get();
+
+  return querySnapshot.docs.map(doc => {
+    const data = doc.data() as IFirebaseUser;
+    return {
+      email: data.EMAIL,
+      nombre: data.NOMBRE,
+      zonaClienteId: data.ZONA_CLIENTE_ID || null,
+    };
   });
 };
 
@@ -107,6 +121,7 @@ export default {
   obtenerAlmacenDelUsuario,
   obtenerInfoUsuario,
   obtenerUsuariosPorCamioneta,
-  obtenerZonasDesktop,
-  asignarZonasDesktop
+  obtenerVendedoresDesktop,
+  asignarVendedoresDesktop,
+  obtenerTodosLosUsuarios
 };
