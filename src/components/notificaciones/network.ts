@@ -91,6 +91,7 @@ router.post("/test", (req: Request, res: Response) => {
     tipoVenta: req.body.tipoVenta ?? "CONTADO",
     userEmail: req.body.userEmail ?? "test@prueba.com",
     vendedoresEmails: req.body.vendedoresEmails ?? [req.body.userEmail ?? "test@prueba.com"],
+    vendedoresNombres: req.body.vendedoresNombres ?? ["VENDEDOR DE PRUEBA"],
     productos: req.body.productos ?? 3,
     zonaClienteId: req.body.zonaClienteId ?? null,
     timestamp: new Date().toISOString(),

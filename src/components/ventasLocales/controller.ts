@@ -241,6 +241,7 @@ const crearVentaLocal = (datosVenta: IVentaLocalInput): Promise<any> => {
           tipoVenta: datosVenta.tipoVenta || "CONTADO",
           userEmail: datosVenta.userEmail,
           vendedoresEmails: vendedores?.map(v => v.email) || [],
+          vendedoresNombres: vendedores?.map(v => v.nombre) || [],
           productos: datosVenta.productos.length,
           zonaClienteId: datosVenta.zonaClienteId || null,
           timestamp: new Date().toISOString(),

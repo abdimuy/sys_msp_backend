@@ -7,6 +7,7 @@ export interface VentaLocalEvent {
   tipoVenta: string;
   userEmail: string;
   vendedoresEmails: string[];
+  vendedoresNombres: string[];
   productos: number;
   zonaClienteId: number | null;
   timestamp: string;
