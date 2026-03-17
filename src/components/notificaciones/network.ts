@@ -11,15 +11,20 @@ router.get("/stream", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "El parámetro email es requerido" });
   }
 
-  // Obtener vendedores permitidos antes de abrir el stream
-  const vendedoresPermitidos = await obtenerVendedoresDesktop(email);
-
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
   });
+  res.write(":connected\n\n");
+  if (typeof (res as any).flush === "function") (res as any).flush();
+
+  // Obtener vendedores permitidos (después de abrir el stream)
+  let vendedoresPermitidos: string[] = [];
+  try {
+    vendedoresPermitidos = await obtenerVendedoresDesktop(email);
+  } catch {};
 
   // Heartbeat cada 30s para mantener la conexión viva
   const heartbeat = setInterval(() => {
