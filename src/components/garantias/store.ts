@@ -198,7 +198,7 @@ export async function addGarantiaWithImages(
       nombreCliente ?? null,
       nombreProducto ?? null,
     ]);
-    const garantiaId: number = garantiaRes.ID;
+    const garantiaId: number = Array.isArray(garantiaRes) ? garantiaRes[0].ID : garantiaRes.ID;
 
     // 3. Inserta cada fila en GARANTIA_IMAGENES
     const insertImagenSql = `

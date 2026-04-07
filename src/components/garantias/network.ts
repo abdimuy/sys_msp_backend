@@ -62,9 +62,9 @@ router.get("/activa", async (req, res) => {
 
 router.get("/imagenes/:garantiaId", controller.getImagesByGarantia)
 
-router.get("/:idGarantia", controller.getGarantiaById)
-
 router.get('/eventos_activos', controller.getEventosGarantiasActivas)
+
+router.get("/:idGarantia", controller.getGarantiaById)
 
 // Ruta: POST /garantias/nueva — crear garantía (con o sin venta asociada)
 router.post(
