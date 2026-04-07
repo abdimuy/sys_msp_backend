@@ -13,4 +13,4 @@ admin.initializeApp({
 
 const db = getFirestore();
 
-export { db, Timestamp, FieldValue, Filter };
+export { db, admin, Timestamp, FieldValue, Filter };
