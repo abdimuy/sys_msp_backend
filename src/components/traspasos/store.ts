@@ -11,8 +11,6 @@ import {
 import Firebird from "node-firebird";
 import moment from "moment";
 import {
-  QUERY_GET_LAST_FOLIO_BY_PREFIX,
-  QUERY_GET_LAST_PREFIX,
   QUERY_INSERT_DOCTO_IN,
   QUERY_INSERT_DOCTO_IN_DET,
   QUERY_INSERT_SUB_MOVTO,
@@ -22,8 +20,6 @@ import {
   QUERY_GET_COSTO_ARTICULO,
   QUERY_VALIDAR_EXISTENCIAS,
   QUERY_GET_CLAVE_ARTICULO,
-  QUERY_GET_NEXT_FOLIO_NUMBER,
-  QUERY_CHECK_FOLIO_EXISTS,
 } from "./querys";
 import {
   ITraspaso,
@@ -55,113 +51,56 @@ interface IDoctoInDetResult {
   DOCTO_IN_DET_ID: number;
 }
 
-// Interfaces para sistema de folios
-interface ILastFolioResult {
-  FOLIO: string;
-  NUMERO_ACTUAL: number;
-}
-
-interface ILastPrefixResult {
-  PREFIJO: string;
-}
-
-interface INextNumberResult {
-  NEXT_NUMBER: number;
-}
-
-interface IFolioExistsResult {
-  EXISTE: number;
-}
 
 // Configuración del sistema de folios
 const FOLIO_CONFIG = {
-  PREFIJO_INICIAL: "TRA",
-  LONGITUD_TOTAL: 9,
-  LONGITUD_PREFIJO: 3,
-  LONGITUD_NUMERO: 6,
-  LIMITE_NUMERICO: 999999,
-  NUMERO_INICIAL: 1,
+  PREFIJO_INICIAL: "MST",
+  DIGITOS: 6,
+  POR_PREFIJO: 999999,
 };
 
 /**
- * Incrementa un prefijo alfabéticamente (TRA -> TRB -> TRC -> ... -> TRZ -> TSA)
- * @param prefijo - Prefijo actual de 3 letras
- * @returns Siguiente prefijo
+ * Convierte un número secuencial del generador a un folio con prefijo auto-incremental.
+ * Número 1-999999       → MST000001-MST999999
+ * Número 1000000-1999998 → MSU000001-MSU999999
+ * Número 1999999-2999997 → MSV000001-MSV999999
+ * Y así sucesivamente: MST → MSU → MSV → ... → MSZ → MTA → MTB → ... → ZZZ
  */
-const incrementarPrefijo = (prefijo: string): string => {
-  const chars = prefijo.split("");
+const numeroAFolio = (numero: number): string => {
+  const prefijoBloques = Math.floor((numero - 1) / FOLIO_CONFIG.POR_PREFIJO);
+  const resto = ((numero - 1) % FOLIO_CONFIG.POR_PREFIJO) + 1;
 
-  // Incrementar desde la última letra hacia la primera
-  for (let i = chars.length - 1; i >= 0; i--) {
-    if (chars[i] < "Z") {
-      chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
-      return chars.join("");
-    } else {
-      chars[i] = "A";
-      // Si llegamos aquí, seguimos al siguiente dígito
-    }
+  // Convertir el índice de bloque a las 3 letras del prefijo partiendo de "MST"
+  const base = [
+    "M".charCodeAt(0) - 65, // 12
+    "S".charCodeAt(0) - 65, // 18
+    "T".charCodeAt(0) - 65, // 19
+  ];
+
+  let carry = prefijoBloques;
+  for (let i = 2; i >= 0; i--) {
+    const total = base[i] + carry;
+    base[i] = total % 26;
+    carry = Math.floor(total / 26);
   }
 
-  // Si todas las letras eran 'Z', empezamos con AAAA (esto es extremadamente improbable)
-  return "AAA";
+  const prefijo = String.fromCharCode(base[0] + 65, base[1] + 65, base[2] + 65);
+  const numero_str = resto.toString().padStart(FOLIO_CONFIG.DIGITOS, "0");
+
+  return `${prefijo}${numero_str}`;
 };
 
 /**
- * Genera un folio único usando múltiples fuentes de entropía
- * Formato: TRA + 6 dígitos (respeta límite de 9 caracteres de BD)
- * @param conceptoId - ID del concepto
- * @returns Folio generado (ej: TRA123456)
+ * Genera el siguiente folio usando el generador atómico de Firebird.
+ * Garantiza unicidad sin race conditions ni reintentos.
  */
-const generateNextFolio = async (
-  conceptoId: number
-): Promise<string> => {
-  const maxRetries = 50;
-  
-  for (let retry = 0; retry < maxRetries; retry++) {
-    try {
-      const now = Date.now();
-      
-      // 1. Componente temporal (3 dígitos - segundos desde epoch mod 1000)
-      const timestampPart = (Math.floor(now / 1000) % 1000).toString().padStart(3, '0');
-      
-      // 2. Componente aleatorio criptográfico (3 dígitos)
-      const crypto = require('crypto');
-      const randomBytes = crypto.randomBytes(2);
-      const randomPart = (randomBytes.readUInt16BE(0) % 1000).toString().padStart(3, '0');
-      
-      // 3. Ensamblar folio (TRA + 6 dígitos = 9 caracteres total)
-      const folio = `${FOLIO_CONFIG.PREFIJO_INICIAL}${timestampPart}${randomPart}`;
-      
-      // 4. Verificar unicidad en BD
-      const existeResult = await query<IFolioExistsResult>({
-        sql: QUERY_CHECK_FOLIO_EXISTS,
-        params: [folio, conceptoId],
-      });
-      
-      if (existeResult[0].EXISTE === 0) {
-        return folio;
-      }
-      
-      // Si existe, agregar delay progresivo para evitar colisiones
-      console.warn(`Folio ${folio} ya existe, reintentando... (${retry + 1}/${maxRetries})`);
-      await new Promise(resolve => setTimeout(resolve, Math.min(retry * 2, 50)));
-      
-    } catch (error) {
-      console.error(`Error en intento ${retry + 1} de generación de folio:`, error);
-      
-      if (retry === maxRetries - 1) {
-        // Último recurso: timestamp de 6 dígitos
-        const timestamp = Date.now();
-        const fallbackNumber = timestamp.toString().slice(-6);
-        return `${FOLIO_CONFIG.PREFIJO_INICIAL}${fallbackNumber}`;
-      }
-      
-      // Delay antes del siguiente intento
-      await new Promise(resolve => setTimeout(resolve, 5 + retry));
-    }
-  }
-  
-  throw new Error("No se pudo generar folio único después de múltiples intentos");
+const generateNextFolio = async (): Promise<string> => {
+  const result = await query<{ NEXT_VAL: number }>({
+    sql: `SELECT GEN_ID(GEN_MST_FOLIO, 1) AS NEXT_VAL FROM RDB$DATABASE`,
+  });
+
+  const numero = result[0].NEXT_VAL;
+  return numeroAFolio(numero);
 };
 
 interface ICostoResult {
@@ -292,9 +231,7 @@ const crearTraspaso = async (
       datosTraspaso.detalles
     );
 
-    folio = await generateNextFolio(
-      TRASPASO_CONFIG.CONCEPTO_SALIDA_ID
-    );
+    folio = await generateNextFolio();
 
     const fechaActual = moment();
     const fecha = datosTraspaso.fecha
@@ -494,11 +431,25 @@ const obtenerTraspasos = async (filtros?: {
     }
   }
 
-  return await query({
+  const traspasos = await query({
     sql,
     params,
     converters: converterTraspasos,
   });
+
+  // Traer productos de cada traspaso
+  const traspasosConProductos = await Promise.all(
+    traspasos.map(async (t: any) => {
+      const detalles = await query({
+        sql: QUERY_GET_TRASPASO_DETALLE,
+        params: [t.DOCTO_IN_ID],
+        converters: converterDetalle,
+      });
+      return { ...t, productos: detalles };
+    })
+  );
+
+  return traspasosConProductos;
 };
 
 // Obtener detalle de un traspaso

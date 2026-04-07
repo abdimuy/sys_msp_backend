@@ -57,7 +57,7 @@ const obtenerTraspasos = (filtros?: {
       const filtrosConvertidos = filtros ? {
         ...filtros,
         fechaInicio: filtros.fechaInicio ? new Date(filtros.fechaInicio) : undefined,
-        fechaFin: filtros.fechaFin ? new Date(filtros.fechaFin) : undefined
+        fechaFin: filtros.fechaFin ? new Date(filtros.fechaFin + 'T23:59:59') : undefined
       } : undefined;
       
       const traspasos = await store.listar(filtrosConvertidos);
