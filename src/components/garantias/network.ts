@@ -44,10 +44,38 @@ const upload = multer({
   },
 });
 
-// Ruta: GET /garantias/activa
+// Ruta: GET /garantias/estados
+router.get("/estados", (_req, res) => {
+  responses.success({ req: _req, res, data: [
+    { value: "PENDIENTE", label: "Pendiente" },
+    { value: "NOTIFICADO", label: "Notificado" },
+    { value: "RECOLECTADO", label: "Recolectado" },
+    { value: "RECIBIDO", label: "Recibido" },
+    { value: "LEVANTAMIENTO_REPORTE", label: "Levantamiento de reporte" },
+    { value: "EN_PROCESO_REPARACION", label: "En proceso de reparación" },
+    { value: "NO_APLICABLE", label: "No aplicable" },
+    { value: "APLICABLE", label: "Aplicable" },
+    { value: "LISTO_PARA_ENTREGAR", label: "Listo para entregar" },
+    { value: "ENTREGADO", label: "Entregado" },
+    { value: "CIERRE_GARANTIA", label: "Cierre de garantía" },
+    { value: "CANCELADO", label: "Cancelado" },
+  ]});
+});
+
+// Ruta: GET /garantias/activa?estado=...&fechaInicio=...&fechaFin=...&zonaClienteId=...&cliente=...
 router.get("/activa", async (req, res) => {
   try {
-    const garantias = await controller.getGarantiasActivas();
+    const { estado, fechaInicio, fechaFin, zonaClienteId, cliente } = req.query;
+
+    const filtros = {
+      estado: estado as string | undefined,
+      fechaInicio: fechaInicio as string | undefined,
+      fechaFin: fechaFin as string | undefined,
+      zonaClienteId: zonaClienteId ? parseInt(zonaClienteId as string) : undefined,
+      cliente: cliente as string | undefined,
+    };
+
+    const garantias = await controller.getGarantiasActivas(filtros);
     responses.success({ req, res, data: garantias, status: 200 });
   } catch (error) {
     responses.error({

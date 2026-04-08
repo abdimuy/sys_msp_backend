@@ -20,8 +20,14 @@ import Firebird from "node-firebird";
 import fs from "fs/promises";
 import path from "path";
 
-async function getGarantiasActivas(): Promise<GarantiaRow[]> {
-  const sql = `
+async function getGarantiasActivas(filtros?: {
+  estado?: string;
+  fechaInicio?: string;
+  fechaFin?: string;
+  zonaClienteId?: number;
+  cliente?: string;
+}): Promise<GarantiaRow[]> {
+  let sql = `
   SELECT MSP_GARANTIAS.ID, MSP_GARANTIAS.DOCTO_CC_ID, FECHA_SOLICITUD, DESCRIPCION_FALLA,
     ESTADO, FECHA_ULT_ACT, OBSERVACIONES, EXTERNAL_ID,
     MSP_GARANTIAS.NOMBRE_CLIENTE, MSP_GARANTIAS.NOMBRE_PRODUCTO,
@@ -30,10 +36,39 @@ async function getGarantiasActivas(): Promise<GarantiaRow[]> {
   LEFT JOIN DOCTOS_CC ON DOCTOS_CC.DOCTO_CC_ID = MSP_GARANTIAS.DOCTO_CC_ID
   LEFT JOIN CLIENTES ON CLIENTES.CLIENTE_ID = DOCTOS_CC.CLIENTE_ID
   LEFT JOIN ZONAS_CLIENTES ON ZONAS_CLIENTES.ZONA_CLIENTE_ID = CLIENTES.ZONA_CLIENTE_ID
-  WHERE ESTADO != 'CANCELADO' AND ESTADO != 'CIERRE_GARANTIA'
+  WHERE 1=1
   `;
 
   const params: any[] = [];
+
+  if (filtros?.estado) {
+    sql += ` AND ESTADO = ?`;
+    params.push(filtros.estado);
+  } else {
+    sql += ` AND ESTADO != 'CANCELADO' AND ESTADO != 'CIERRE_GARANTIA'`;
+  }
+
+  if (filtros?.fechaInicio) {
+    sql += ` AND FECHA_SOLICITUD >= ?`;
+    params.push(filtros.fechaInicio);
+  }
+
+  if (filtros?.fechaFin) {
+    sql += ` AND FECHA_SOLICITUD <= ?`;
+    params.push(filtros.fechaFin + ' 23:59:59');
+  }
+
+  if (filtros?.zonaClienteId) {
+    sql += ` AND ZONAS_CLIENTES.ZONA_CLIENTE_ID = ?`;
+    params.push(filtros.zonaClienteId);
+  }
+
+  if (filtros?.cliente) {
+    sql += ` AND UPPER(MSP_GARANTIAS.NOMBRE_CLIENTE) LIKE ?`;
+    params.push(`%${filtros.cliente.toUpperCase()}%`);
+  }
+
+  sql += ` ORDER BY FECHA_SOLICITUD DESC`;
 
   const rows = await query<GarantiaRow>({ sql, params, converters: [{column: "ZONA_CLIENTE_NOMBRE", type: "buffer"}] });
   return rows as GarantiaRow[];

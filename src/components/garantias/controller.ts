@@ -13,8 +13,14 @@ import { Request, Response } from "express";
 import responses from "../../network/responses";
 import handleError from "../../network/handleError";
 
-const getGarantiasActivas = async (): Promise<GarantiaRow[]> => {
-  return store.getGarantiasActivas();
+const getGarantiasActivas = async (filtros?: {
+  estado?: string;
+  fechaInicio?: string;
+  fechaFin?: string;
+  zonaClienteId?: number;
+  cliente?: string;
+}): Promise<GarantiaRow[]> => {
+  return store.getGarantiasActivas(filtros);
 };
 
 const addGarantia = async (
