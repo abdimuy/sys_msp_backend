@@ -1,9 +1,9 @@
 import express from "express";
 import router from "./network/router";
 import cors from "cors";
-import { connectToMongo } from "./repositories/mongoConnection";
-import { syncInitialData } from "./components/sincronizarAMongo/store";
-import store from "./components/pagos/store";
+// import { connectToMongo } from "./repositories/mongoConnection";
+// import { syncInitialData } from "./components/sincronizarAMongo/store";
+// import store from "./components/pagos/store";
 import path from "path";
 import fs from "fs";
 
@@ -32,34 +32,34 @@ const uploadsDir = path.join(__dirname, "..", "uploads");
 // 1. Servir la carpeta 'uploads' en la URL '/uploads'
 app.use("/uploads", express.static(uploadsDir));
 
-(async () => {
-  try {
-    const db = await connectToMongo();
-    console.log("La conexión a MongoDB se realizó correctamente.");
-    
-    // Ejecutar sincronización inicial al levantar la API
-    // console.log("Ejecutando sincronización inicial de datos...");
-    // await syncInitialData();
-    
-    // Aquí puedes iniciar tu servidor o ejecutar consultas usando "db"
-  } catch (error) {
-    console.error("No se pudo conectar a MongoDB:", error);
-  }
-})();
+// (async () => {
+//   try {
+//     const db = await connectToMongo();
+//     console.log("La conexión a MongoDB se realizó correctamente.");
+//
+//     // Ejecutar sincronización inicial al levantar la API
+//     // console.log("Ejecutando sincronización inicial de datos...");
+//     // await syncInitialData();
+//
+//     // Aquí puedes iniciar tu servidor o ejecutar consultas usando "db"
+//   } catch (error) {
+//     console.error("No se pudo conectar a MongoDB:", error);
+//   }
+// })();
 
 
 // Configuración mejorada de sincronización
-const SYNC_INTERVAL = 30000; // 30 segundos
+// const SYNC_INTERVAL = 30000; // 30 segundos
 
 // Ejecutar sincronización inicial
-store.syncChangesToMongo();
+// store.syncChangesToMongo();
 
 // Configurar intervalo de sincronización
-setInterval(() => {
-  store.syncChangesToMongo();
-}, SYNC_INTERVAL);
+// setInterval(() => {
+//   store.syncChangesToMongo();
+// }, SYNC_INTERVAL);
 
-console.log(`Sincronización automática configurada cada ${SYNC_INTERVAL / 1000} segundos`);
+// console.log(`Sincronización automática configurada cada ${SYNC_INTERVAL / 1000} segundos`);
 
 import garantias from "./components/garantias/network";
 
