@@ -2,7 +2,7 @@ import axios from 'axios';
 import https from 'https'
 
 const ApiMicrosip = axios.create({
-  baseURL: 'https://localhost:44320/api/',
+  baseURL: process.env.MICROSIP_API_BASE_URL || 'https://localhost:44320/api/',
   headers: {
     'Content-Type': 'application/json',
   },

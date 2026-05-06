@@ -7,8 +7,8 @@ import {
   AggregateOptions,
 } from "mongodb";
 
-const mongoUrl = "mongodb://localhost:27017";
-const dbName = "msp";
+const mongoUrl = process.env.MONGO_URL || "mongodb://localhost:27017";
+const dbName = process.env.MONGO_DB || "msp";
 
 let dbInstance: Db | null = null;
 

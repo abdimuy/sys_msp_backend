@@ -1,20 +1,18 @@
 import Firebird from "node-firebird";
 
 const options: any = {
-  // host: "SERVERM",
-  // database: "C:\\Microsip datos\\PRUEBA_ALDRICH.fdb",
-  database: "C:\\Microsip datos\\MUEBLERA_SNP.fdb",
-  port: 3050,
-  host: "localhost",
-  // database: "C:\\dev\\MUEBLERA_SNP.fdb",
-  // database: "C:\\Users\\abdid\\Documents\\MUEBLERA_SNP\\MUEBLERA_SNP.fdb",
-  user: "SYSDBA",
-  password: "masterkey",
-  lowercase_keys: false,
+  host: process.env.FB_HOST || "localhost",
+  port: Number(process.env.FB_PORT) || 3050,
+  database: process.env.FB_DATABASE || "C:\\Microsip datos\\MUEBLERA_SNP.fdb",
+  user: process.env.FB_USER || "SYSDBA",
+  password: process.env.FB_PASSWORD || "masterkey",
+  lowercase_keys: process.env.FB_LOWERCASE_KEYS === "true",
   role: null,
 };
 
-export const pool = Firebird.pool(1000, options);
+const POOL_SIZE = Number(process.env.FB_POOL_SIZE) || 1000;
+
+export const pool = Firebird.pool(POOL_SIZE, options);
 
 export interface IQuery {
   sql: string;
